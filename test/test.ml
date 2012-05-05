@@ -11,6 +11,7 @@ let fail fmt =
   Format.kfprintf fail Format.str_formatter fmt
 
 let encoder_invalid () = 
+  log "Invalid encodes.\n";
   let rec encode_seq e = function 
   | v :: vs -> ignore (Jsonm.Uncut.encode e v); encode_seq e vs
   | [] -> ()
@@ -50,6 +51,7 @@ let encoder_invalid () =
   ()
 
 let encoder_escapes () = 
+  log "Encoder escapes.\n";
   let encode ascii sascii =
     let b = Buffer.create 10 in 
     let e = Jsonm.encoder (`Buffer b) in 
@@ -69,6 +71,7 @@ let encoder_escapes () =
   ()
 
 let decoder_encoding_guess () = 
+  log "Decoder encoding guesses.\n";
   let test enc s = 
     let d = Jsonm.decoder (`String s) in
     let enc' = (ignore (Jsonm.decode d); Jsonm.decoder_encoding d) in
@@ -98,6 +101,7 @@ let test_seq decode src seq =
 let arr seq = [`Lexeme `As] @ seq @ [`Lexeme `Ae; `End; `End; `End ]
 
 let decoder_comments () = 
+  log "Decoder comments.\n";
   let test (s,c) src = test_seq Jsonm.Uncut.decode src (arr [`Comment (s,c)]) in
   let test_eoi v src = test_seq Jsonm.Uncut.decode  src
     [`Lexeme `As; `Lexeme `Ae; v; `End]; 
@@ -117,6 +121,7 @@ let decoder_comments () =
   ()
 
 let decoder_escapes () =
+  log "Decoder escapes.\n";
   let test str src = test_seq Jsonm.decode src (arr [`Lexeme (`String str)]) in
   let test_ill ill str src = test_seq Jsonm.decode src
     (arr [`Error (`Illegal_escape ill); `Lexeme (`String str)])
@@ -145,6 +150,7 @@ let decoder_escapes () =
   ()
 
 let decoder_strings () = 
+  log "Decoder strings.\n";
   test_seq Jsonm.decode "[\"blibla\"]" (arr [ `Lexeme (`String "blibla") ]); 
   test_seq Jsonm.decode "[\"bli\nbla\"]" 
     (arr [`Error (`Illegal_string_uchar 0x0A); 
@@ -153,7 +159,8 @@ let decoder_strings () =
     [`Lexeme `As; `Error (`Unclosed `Comment); `End; `End]; 
   ()
 
-let decoder_literals () = 
+let decoder_literals () =
+  log "Decoder literals.\n"; 
   test_seq Jsonm.decode "[null]" (arr [ `Lexeme `Null]); 
   test_seq Jsonm.decode "[true]" (arr [ `Lexeme (`Bool true)]); 
   test_seq Jsonm.decode "[false]" (arr [ `Lexeme (`Bool false)]); 
@@ -167,6 +174,7 @@ let decoder_literals () =
   ()
 
 let decoder_numbers () = 
+  log "Decoder numbers.\n"; 
   test_seq Jsonm.decode "[1.0]" (arr [ `Lexeme (`Float 1.0)]);
   test_seq Jsonm.decode "[1e12]" (arr [ `Lexeme (`Float 1e12)]);
   test_seq Jsonm.decode "[-1e12]" (arr [ `Lexeme (`Float ~-.1e12)]);
@@ -180,6 +188,7 @@ let decoder_numbers () =
   ()
 
 let decoder_arrays () = 
+  log "Decoder arrays.\n";
   test_seq Jsonm.decode "[]" (arr []);
   test_seq Jsonm.decode "[" 
     [`Lexeme `As; `Error (`Unclosed `As); `End; `End; `End];
@@ -204,6 +213,7 @@ let decoder_arrays () =
   ()
 
 let decoder_objects () =
+  log "Decoder objects.\n";
   test_seq Jsonm.decode "{" 
     [`Lexeme `Os; `Error (`Unclosed `Os); `End; `End; `End];
   test_seq Jsonm.decode "{null" 
@@ -235,6 +245,7 @@ let decoder_objects () =
   ()
 
 let decoder_json_text () = 
+  log "Decoder JSON text.\n";
   test_seq Jsonm.decode "a : null {}" 
     [ `Error (`Expected `Json); `Lexeme `Os; `Lexeme `Oe];
   test_seq Jsonm.decode "a : null []" 
@@ -242,12 +253,14 @@ let decoder_json_text () =
   ()
 
 let decoder_bom () = 
+  log "Decoder BOM.\n";
   let seq = [`Error `Illegal_BOM; `Lexeme `Os; `Lexeme `Oe] in
   test_seq Jsonm.decode "\xEF\xBB\xBF  {}" seq;
   test_seq Jsonm.decode "\xFE\xFF\x00\x7B\x00\x7D" seq; 
   test_seq Jsonm.decode "\xFE\xFF\x00\x7B\x00\x7D\x00" seq
   
 let decoder_eoi () =
+  log "Decoder end of input.\n";
   test_seq Jsonm.decode "" [`Error (`Expected `Json) ];
   test_seq Jsonm.decode "{} a : null" 
     [ `Lexeme `Os; `Lexeme `Oe; `Error (`Expected `Eoi); ];
@@ -256,6 +269,7 @@ let decoder_eoi () =
   ()
     
 let trip () = 
+  log "Codec round-trips.\n";
   let trip s = 
     let b = Buffer.create (String.length s) in
     let d = Jsonm.decoder (`String s) in 
