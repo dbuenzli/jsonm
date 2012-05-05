@@ -1,0 +1,7 @@
+<**/*.{ml,mli}> : annot, debug, package(uutf)
+<src> : include
+<test> : include
+<test/jsontrip.{byte,native}> : package(unix), package(uutf)
+<test/ocamltweets.{byte,native}> : package(unix), package(uutf)
+<test/examples.{byte,native}> : package(unix), package(uutf)
+<test/test.{byte,native}> : package(uutf)

@@ -1,0 +1,78 @@
+OASISFormat: 0.3
+Name: jsonm
+Version: 0.0.1
+Synopsis: JSON non-blocking streaming codec for OCaml
+Authors: Daniel Bünzli <daniel.buenzli at erratique.ch>
+Copyrights: (c) 2012 Daniel C. Bünzli
+License: BSD3
+Homepage: http://erratique.ch/software/jsonm
+Description:
+ Jsonm is a non-blocking streaming codec to decode and encode the JSON
+ data format. It can process JSON text without blocking on IO and
+ without a complete in-memory representation of the data.
+ .
+ The alternative "uncut" codec also processes whitespace and
+ (non-standard) JSON with JavaScript comments.
+ .
+ Jsonm is made of a single module and depends on [Uutf][1]. It is distributed 
+ under the BSD3 license.
+ .
+ [1]: http://erratique.ch/software/uutf
+
+OCamlVersion: >= 3.12.0
+Plugins: META (0.3)
+BuildTools:ocamlbuild
+
+Library jsonm
+ Path: src
+ BuildDepends: uutf
+ Modules: Jsonm
+
+Executable jsontrip
+ Path: test
+ MainIs: jsontrip.ml
+ CompiledObject: Best
+ BuildDepends: uutf, jsonm, unix
+
+Executable ocamltweets
+ Path: test
+ MainIs: ocamltweets.ml
+ CompiledObject: Best
+ BuildDepends: uutf, jsonm, unix
+
+Executable test
+ Path: test
+ MainIs: test.ml
+ CompiledObject: Best
+ BuildDepends: uutf, jsonm
+ Install: false
+
+Executable jtree
+ Path: test
+ MainIs: jtree.ml
+ CompiledObject: Best
+ BuildDepends: uutf, jsonm
+ Install: false
+
+Test test
+ Command: $test
+
+Document api
+ Title: Jsonm's documentation and API reference
+ Type: ocamlbuild (0.3)
+ BuildTools+: ocamldoc
+ XOCamlbuildLibraries: jsonm
+ XOCamlbuildPath: doc
+
+Document distribution
+ Title: "Jsonm's README and CHANGES files"
+ DataFiles: README CHANGES
+
+Document samples
+ Title: "Jsonm's sample code"
+ DataFiles: test/*.ml
+
+SourceRepository head
+ Type: git
+ Location: git://erratique.ch/repos/jsonm.git
+ Browser: http://erratique.ch/repos/jsonm
