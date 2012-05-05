@@ -1,6 +1,5 @@
 (* This code is in the public domain *) 
 
-
 (* Generic JSON tree type *)
 
 type json = 
@@ -59,9 +58,9 @@ let json_to_dst ~minify
 let main () = 
   let exec = Filename.basename Sys.executable_name in
   let usage = Printf.sprintf 
-    "Usage: %s <options>\n\
-    \  recode JSON from stdin to stdout via an in-memory tree representation.\n\
-         Options:" exec
+    "Usage: %s [OPTION]...\n\
+     Recode JSON from stdin to stdout via an in-memory tree representation.\n\
+     Options:" exec
   in
   let minify = ref true in 
   let options = [ "-pp", Arg.Clear minify, "pretty print output."; ] in
@@ -73,5 +72,3 @@ let main () =
       Format.eprintf "-:%d.%d-%d.%d: %a" l1 c1 l2 c2 Jsonm.pp_error e
 
 let () = main ()
-
-

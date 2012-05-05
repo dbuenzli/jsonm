@@ -1,7 +1,7 @@
 OASISFormat: 0.3
 Name: jsonm
-Version: 0.0.1
-Synopsis: JSON non-blocking streaming codec for OCaml
+Version: 0.9.0
+Synopsis: Non-blocking streaming JSON codec for OCaml
 Authors: Daniel Bünzli <daniel.buenzli at erratique.ch>
 Copyrights: (c) 2012 Daniel C. Bünzli
 License: BSD3
@@ -32,26 +32,33 @@ Executable jsontrip
  Path: test
  MainIs: jsontrip.ml
  CompiledObject: Best
- BuildDepends: uutf, jsonm, unix
+ BuildDepends: jsonm, unix
 
 Executable ocamltweets
  Path: test
  MainIs: ocamltweets.ml
  CompiledObject: Best
- BuildDepends: uutf, jsonm, unix
+ BuildDepends: jsonm, unix
 
 Executable test
  Path: test
  MainIs: test.ml
  CompiledObject: Best
- BuildDepends: uutf, jsonm
+ BuildDepends: jsonm
  Install: false
 
 Executable jtree
  Path: test
  MainIs: jtree.ml
  CompiledObject: Best
- BuildDepends: uutf, jsonm
+ BuildDepends: jsonm
+ Install: false
+
+Executable examples
+ Path: test
+ MainIs: examples.ml
+ CompiledObject: Best
+ BuildDepends: unix, jsonm
  Install: false
 
 Test test

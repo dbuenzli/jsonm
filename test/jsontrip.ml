@@ -295,8 +295,8 @@ let trip inf sin sout use_unix usize ie uncut minify =
 let main () = 
  let usage = Printf.sprintf 
     "Usage: %s [OPTION]... [INFILE]\n\
-    \  recode JSON from stdin to stdout.\n\
-         Options:" exec
+     Recode JSON from stdin to stdout.\n\
+     Options:" exec
   in
   let cmd = ref `Trip in
   let set_cmd v () = cmd := v in

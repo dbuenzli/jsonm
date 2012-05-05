@@ -10,8 +10,8 @@ let pp_text ppf s =    (* hints whitespace, this should really be in Format. *)
   in
   while (!right <> len) do 
     if s.[!right] = '\n' then (flush (); Format.pp_force_newline ppf ()) else
-    if s.[!right] = ' ' then (flush (); Format.pp_print_space ppf ())
-    else incr right;
+    if s.[!right] = ' ' then (flush (); Format.pp_print_space ppf ()) else 
+    incr right;
   done;
   if !left <> len then flush ()
 
@@ -76,8 +76,13 @@ let main () =
      Options:" exec
   in
   let max = ref 50 in 
-  let options = [ "-max", Arg.Set_int max, "maximal number of tweets."; ] in
+  let pmode = ref false in
+  let options = [ 
+    "-max", Arg.Set_int max, "maximal number of tweets."; 
+    "-p", Arg.Set pmode, "procrastination mode."; ] 
+  in
   Arg.parse options (fun _ -> raise (Arg.Bad "illegal argument")) usage;
+  if !pmode then pp Format.std_formatter "Work harder !@." else 
   ocaml_tweets !max
-
+  
 let () = main ()

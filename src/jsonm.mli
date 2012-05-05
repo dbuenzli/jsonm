@@ -63,7 +63,7 @@ member = (`Name s) value
     of lexemes or [Invalid_argument] is raised. Only the UTF-8
     encoding scheme is supported. The strings of encoded [`Name] and
     [`String] lexemes are assumed to be immutable and must be UTF-8
-    encoded, this is {b not checked} by the module. In these strings,
+    encoded, this is {b not} checked by the module. In these strings,
     the delimiter characters [U+0022] and [U+005C] (['"'], ['\'])
     aswell as the control characters [U+0000-U+001F] are automatically
     escaped by the encoders, as mandated by the standard. *)
@@ -109,7 +109,6 @@ type decoder
 
 val decoder :?encoding:[< encoding] -> [< src] -> decoder
 (** [decoder encoding src] is a JSON decoder that inputs from [src].  
-    
     [encoding] specifies the character encoding of the data. If unspecified
     the encoding is guessed as 
     {{:http://tools.ietf.org/html/rfc4627#section-3}suggested} by
@@ -126,6 +125,9 @@ val decode : decoder -> [> `Await | `Lexeme of lexeme | `End | `Error of error ]
        in a best-effort decoding it can still continue to decode 
        after an error (see {!errorrecovery}) although the resulting sequence 
        of [`Lexeme]s is undefined and may not be well-formed.}}
+
+    The {!Uncut.pp_decode} function can be used to inspect decode results.
+   
     {b Note.} Repeated invocation always eventually returns [`End], even 
     in case of errors. *)
 
@@ -217,7 +219,7 @@ end
     decoding if you want to process whitespace but stick to the standard.
     
     The uncut codec preserves as much of the original input as
-    possible. Perfect round-trip with [Uutf] is however impossible for 
+    possible. Perfect round-trip with [Jsonm] is however impossible for 
     the following reasons:
     {ul 
     {- Escapes unescaped by the decoder may not be escaped or escaped 
@@ -278,7 +280,7 @@ module Uncut : sig
   (** [encode] is like {!Jsonm.encode} but for the {{!uncutdatamodel}
       uncut data model}.
 
-      {b IMPORTANT.} Never encode [`Comment] for the web, it's 
+      {b IMPORTANT.} Never encode [`Comment] for the web, it is 
       non-standard and breaks interoperability. *)
 end
 
@@ -300,7 +302,8 @@ end
        are limited by {!Sys.max_string_length}.  There is no built-in
        protection against the fact that the internal OCaml [Buffer.t]
        value may raise [Failure] on {!Jsonm.decode}. This should
-       however only be a problem on 32-bits platforms.}}
+       however only be a problem on 32-bits platforms if your 
+       strings are greater than 16Mo.}}
 
     Position tracking assumes that each decoded Unicode scalar value
     has a column width of 1. The same assumption may not be made by
@@ -335,12 +338,14 @@ end
 (** {1:errorrecovery Error recovery} 
 
     After a decoding error, if best-effort decoding is performed. The following
-    happens:
+    happens before continuing:
     {ul 
-    {- [`Illegal_BOM], the initial BOM is ignored.}
+    {- [`Illegal_BOM], the initial 
+       {{:http://unicode.org/glossary/#byte_order_mark}BOM} is skipped.}
     {- [`Illegal_bytes], [`Illegal_escape], [`Illegal_string_uchar], a
-       Unicode replacement character ([U+FFFD]) is substituted to
-       the illegal sequence.}
+       Unicode 
+       {{:http://unicode.org/glossary/#replacement_character}replacement 
+       character} ([U+FFFD]) is substituted to the illegal sequence.}
     {- [`Illegal_literal], [`Illegal_number] the corresponding 
        [`Lexeme] is skipped.}
     {- [`Expected r], input is discarded until a synchronyzing lexeme
@@ -492,7 +497,6 @@ let json_to_dst ~minify
   | _ -> invalid_arg "invalid json text"
 ]}
 *)
-
     
 (*---------------------------------------------------------------------------
    Copyright %%COPYRIGHT%%

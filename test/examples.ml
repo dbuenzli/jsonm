@@ -68,8 +68,3 @@ let memsel ?encoding names
   | `Await -> assert false
   in
   loop [] names (Jsonm.decoder ?encoding src)
-
-
-
-
-
