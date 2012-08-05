@@ -1,6 +1,6 @@
 OASISFormat: 0.3
 Name: jsonm
-Version: 0.9.0
+Version: 0.9.1
 Synopsis: Non-blocking streaming JSON codec for OCaml
 Authors: Daniel Bünzli <daniel.buenzli at erratique.ch>
 Copyrights: (c) 2012 Daniel C. Bünzli
