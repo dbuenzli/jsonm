@@ -59,12 +59,13 @@ let main () =
   let exec = Filename.basename Sys.executable_name in
   let usage = Printf.sprintf 
     "Usage: %s [OPTION]...\n\
-     Recode JSON from stdin to stdout via an in-memory tree representation.\n\
+    \ Recode JSON from stdin to stdout via an in-memory tree representation.\n\
      Options:" exec
   in
   let minify = ref true in 
-  let options = [ "-pp", Arg.Clear minify, "pretty print output."; ] in
-  Arg.parse options (fun _ -> raise (Arg.Bad "illegal argument")) usage;
+  let options = [ "-pp", Arg.Clear minify, " Pretty print output"; ] in
+  let anon _ = raise (Arg.Bad "illegal argument") in 
+  Arg.parse (Arg.align options) anon usage;
   let minify = !minify in
   match json_of_src (`Channel stdin) with 
   | `JSON j -> json_to_dst ~minify (`Channel stdout) j

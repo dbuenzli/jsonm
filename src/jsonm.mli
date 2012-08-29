@@ -18,7 +18,7 @@
     Consult the {{!datamodel}data model}, {{!limitations}limitations}
     and {{!examples}examples} of use.
 
-    {e Version %%VERSION%% - %%AUTHORS%% }
+    {e Release %%VERSION%% - %%AUTHORS%% }
     {3 References}
     {ul 
     {- D. Crockford

@@ -295,7 +295,7 @@ let trip inf sin sout use_unix usize ie uncut minify =
 let main () = 
  let usage = Printf.sprintf 
     "Usage: %s [OPTION]... [INFILE]\n\
-     Recode JSON from stdin to stdout.\n\
+     \ Recode JSON from stdin to stdout.\n\
      Options:" exec
   in
   let cmd = ref `Trip in
@@ -325,29 +325,33 @@ let main () =
   let maxs = ref 15 in 
   let nat s r v = if v > 0 then r := v else log "%s must be > 0, ignored\n" s in
   let options = [
-    "-dump", Arg.Unit (set_cmd `Dump), "dump lexemes and their position.";
-    "-guess", Arg.Unit (set_cmd `Guess), "only guess the encoding.";
-    "-dec", Arg.Unit (set_cmd `Decode), "decode only, no encoding."; 
-    "-enc", Arg.Unit (set_cmd `Encode), "(random) encode only, no decoding.";
+    "-dump", Arg.Unit (set_cmd `Dump), 
+    " Dump lexemes and their position, one per line";
+    "-guess", Arg.Unit (set_cmd `Guess), " Only guess the encoding";
+    "-dec", Arg.Unit (set_cmd `Decode), " Decode only, no encoding"; 
+    "-enc", Arg.Unit (set_cmd `Encode), " Encode only (random), no decoding";
     "-ie", Arg.String ie_fun,
-    "<enc>, input encoding, UTF-8, UTF-16, UTF-16BE, UTF-16LE.";
-    "-uncut", Arg.Set uncut, "use the uncut codec (allows comments in input)."; 
-    "-pp", Arg.Clear minify, "pretty print output (minified by default)."; 
-    "-sin", Arg.Set sin, "input as string and decode the string.";
-    "-sout", Arg.Set sout, "encode as string and output the string.";
-    "-unix", Arg.Set use_unix, "use Unix IO.";
-    "-usize", Arg.Int (nat "-usize" usize),"Unix IO buffer sizes in bytes.";
-    "-rseed", Arg.Int (nat "-rseed" rseed), "random seed."; 
+    "<enc> Input encoding: UTF-8, UTF-16, UTF-16BE or UTF-16LE";
+    "-uncut", Arg.Set uncut, 
+    " Use the uncut codec (allows comments in the input)";
+    "-pp", Arg.Clear minify, " Pretty print output (minified by default)"; 
+    "-sin", Arg.Set sin, " Input as string and decode the string";
+    "-sout", Arg.Set sout, " Encode as string and output the string";
+    "-unix", Arg.Set use_unix, " Use Unix IO";
+    "-usize", Arg.Int (nat "-usize" usize),
+    "<int> Unix IO buffer sizes in bytes";
+    "-rseed", Arg.Int (nat "-rseed" rseed), "<int> Random seed"; 
     "-rcount", Arg.Int (nat "-rcount" rcount), 
-    "number of JSON values in random JSON text.";
-    "-rint", Arg.Set rint, "generate only integer JSON numbers.";
-    "-maxd", Arg.Int (nat "-maxd" maxd), "maximal depth in random JSON text."; 
+    "<int> Number of JSON values in random JSON text";
+    "-rint", Arg.Set rint, " Generate only integer JSON numbers (no floats)";
+    "-maxd", Arg.Int (nat "-maxd" maxd), 
+    "<int> Maximal depth in random JSON text"; 
     "-maxl", Arg.Int (nat "-maxl" maxl), 
-    "maximal inner array and object length in random JSON.";
+    "<int> Maximal inner array and object length in random JSON";
     "-maxs", Arg.Int (nat "-maxs" maxs), 
-    "maximal string length in random JSON text."; ]
+    "<int> Maximal string length in random JSON text"; ]
   in
-  Arg.parse options set_inf usage;
+  Arg.parse (Arg.align options) set_inf usage;
   match !cmd with 
   | `Dump -> dump !inf !sin !use_unix !usize !ie !uncut 
   | `Guess -> guess !inf

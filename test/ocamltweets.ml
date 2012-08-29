@@ -72,16 +72,17 @@ let main () =
   let exec = Filename.basename Sys.executable_name in
   let usage = str
     "Usage: %s [OPTION]...\n\
-     Print the latest tweets about OCaml on stdout.\n\
+     \ Print the latest tweets about OCaml on stdout.\n\
      Options:" exec
   in
   let max = ref 50 in 
   let pmode = ref false in
   let options = [ 
-    "-max", Arg.Set_int max, "maximal number of tweets."; 
-    "-p", Arg.Set pmode, "procrastination mode."; ] 
+    "-max", Arg.Set_int max, "<int> Maximal number of tweets"; 
+    "-p", Arg.Set pmode, " Procrastination mode"; ] 
   in
-  Arg.parse options (fun _ -> raise (Arg.Bad "illegal argument")) usage;
+  let anon _ = raise (Arg.Bad "illegal argument") in
+  Arg.parse (Arg.align options) anon usage;
   if !pmode then pp Format.std_formatter "Work harder !@." else 
   ocaml_tweets !max
   
