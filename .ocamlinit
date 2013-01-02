@@ -1,4 +1,4 @@
-#directory "_build/uutf"
 #directory "_build/src"
-#load "uutf.cmo"
+#use "topfind"
+#require "uutf"
 #load "jsonm.cmo"
