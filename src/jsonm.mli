@@ -201,7 +201,7 @@ module Manual : sig
 
   val dst : encoder -> string -> int -> int -> unit
   (** [dst e s j l] provides [e] with [l] bytes to write, starting
-      at [j] in [s]. This byte rang is written by calls to {!encode} with [e]
+      at [j] in [s]. This byte range is written by calls to {!encode} with [e]
       until [`Partial] is returned. Use {!dst_rem} to know the remaining
       number of non-written free bytes in [s]. *)
 
