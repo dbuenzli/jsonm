@@ -34,12 +34,6 @@ Executable jsontrip
  CompiledObject: Best
  BuildDepends: jsonm, unix
 
-Executable ocamltweets
- Path: test
- MainIs: ocamltweets.ml
- CompiledObject: Best
- BuildDepends: jsonm, unix
-
 Executable test
  Path: test
  MainIs: test.ml
