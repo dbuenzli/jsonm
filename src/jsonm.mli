@@ -88,7 +88,7 @@ type error = [
 | `Illegal_number of string
 | `Unclosed of [ `As | `Os | `String | `Comment ]
 | `Expected of 
-    [ `Comment | `Value | `Name | `Name_sep | `Json | `Eoi
+    [ `Comment | `Value | `Name | `Name_sep | `Json | `Eoi | `JsonOrEoi
     | `Aval of bool (* [true] if first array value  *)
     | `Omem of bool (* [true] if first object member *) ]]
 
@@ -107,12 +107,13 @@ type src = [ `Channel of in_channel | `String of string | `Manual ]
 type decoder
 (** The type for JSON decoders. *)
 
-val decoder :?encoding:[< encoding] -> [< src] -> decoder
+val decoder : ?stream:bool -> ?encoding:[< encoding] -> [< src] -> decoder
 (** [decoder encoding src] is a JSON decoder that inputs from [src].  
     [encoding] specifies the character encoding of the data. If unspecified
     the encoding is guessed as 
     {{:http://tools.ietf.org/html/rfc4627#section-3}suggested} by
-    the standard. *)
+    the standard.
+    [stream] specifies whether several values can be read (false by default) *)
 
 val decode : decoder -> [> `Await | `Lexeme of lexeme | `End | `Error of error ]
 (** [decode d] is:
@@ -155,11 +156,12 @@ type dst = [ `Channel of out_channel | `Buffer of Buffer.t | `Manual ]
 type encoder 
 (** The type for JSON encoders. *)
 
-val encoder : ?minify:bool -> [< dst] -> encoder
+val encoder : ?stream:bool -> ?minify:bool -> [< dst] -> encoder
 (** [encoder minify dst] is an encoder that outputs to [dst]. If
     [minify] is [true] (default) the output is made as compact as
     possible, otherwise the output is indented. If you want better
-    control on whitespace use [minify = true] and {!Uncut.encode}. *)
+    control on whitespace use [minify = true] and {!Uncut.encode}.
+    [stream] specifies whether several values can be written. *)
 
 val encode : encoder -> [< `Await | `End | `Lexeme of lexeme ] -> 
   [`Ok | `Partial]

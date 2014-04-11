@@ -80,7 +80,7 @@ type error = [
 | `Illegal_number of string
 | `Unclosed of [ `As | `Os | `String | `Comment ]
 | `Expected of 
-    [ `Comment | `Value | `Name | `Name_sep | `Json | `Eoi
+    [ `Comment | `Value | `Name | `Name_sep | `Json | `Eoi | `JsonOrEoi
     | `Aval of bool (* [true] if first array value  *)
     | `Omem of bool (* [true] if first object member *) ]]
 
@@ -107,6 +107,7 @@ let err_exp_arr_nxt = `Error (`Expected (`Aval false))
 let err_exp_obj_fst = `Error (`Expected (`Omem true))
 let err_exp_obj_nxt = `Error (`Expected (`Omem false))
 let err_exp_json = `Error (`Expected `Json)
+let err_exp_json_eoi = `Error (`Expected `JsonOrEoi)
 let err_exp_eoi = `Error (`Expected `Eoi)
 
 let pp_uchar ppf u = 
@@ -157,6 +158,7 @@ let pp_error ppf = function
     | `Omem false ->pp ppf "value@ separator@ or@ object@ end@ (','@ or@ '}')@]"
     | `Json -> pp ppf "JSON@ text@ ('{'@ or@ '[')@]"
     | `Eoi -> pp ppf "end@ of@ input@]"
+    | `JsonOrEoi -> pp ppf "JSON@ text@ or@ end@ of@ input@]" 
     end
 
 type pos = int * int
@@ -188,6 +190,7 @@ type decoder =
       [ `As of pos | `Os of pos ] list;
     mutable next_name : bool;    (* [true] if next decode should be [`Name]. *)
     mutable last_start : bool;      (* [true] if last lexeme was `As or `Os. *)
+    mutable stream : bool;          (* [true] if several values can be read. *)
     mutable k :                                     (* decoder continuation. *)
       decoder -> [ decode | uncut ] }
 
@@ -360,27 +363,35 @@ let r_end k d =                                              (* end of input *)
   let drain k d = spos d; discard_to ux_eoi ux_eoi err_exp_eoi k d in
   drain ret_eoi d
 
+let rec r_json k d =                       (* {begin-array} / {begin-object} *)
+  let err k d = spos d; discard_to u_lbrack u_lbrace err_exp_json (r_json k)d in
+  if d.c = u_lbrack || d.c = u_lbrace then r_value err k d else err k d
+
+let rec r_json_or_end k d =               (* {begin-array} / {begin-object} / eoi *)
+  let err k d =
+    spos d;discard_to u_lbrack u_lbrace err_exp_json_eoi (r_json_or_end k)d in
+  if d.c = u_lbrack || d.c = u_lbrace then r_value err k d
+  else if d.c = ux_eoi then ret `End ret_eoi d else err k d
+
 let rec r_lexeme d = match d.stack with 
 | `As _ :: _ -> r_white (r_arr_val r_lexeme) d
 | `Os _ :: _ -> 
     if d.next_name then r_white (r_obj_name r_lexeme) d else 
     r_white (r_obj_value r_lexeme) d
-| [] -> r_white (r_end r_lexeme) d
-
-let rec r_json k d =                       (* {begin-array} / {begin-object} *)
-  let err k d = spos d; discard_to u_lbrack u_lbrace err_exp_json (r_json k)d in
-  if d.c = u_lbrack || d.c = u_lbrace then r_value err k d else err k d
+| [] when d.stream ->
+  r_white (r_json_or_end r_lexeme) d  (* read another JSON value, or EOI*)
+| [] -> r_white (r_end r_lexeme) d  (* read one value, now stop *)
 
 let r_start d =                                            (* start of input *)
   let bom k d = if Uutf.decoder_removed_bom d.u then ret err_bom k d else k d in
   readc (bom (r_white (r_json r_lexeme))) d
     
-let decoder ?encoding src =
+let decoder ?(stream=false) ?encoding src =
   let u = Uutf.decoder ?encoding ~nln:(`ASCII 0x000A) src in
   { u; buf = Buffer.create 1024; uncut = false; 
     s_line = 1; s_col = 0; e_line = 1; e_col = 0; 
     c = ux_soi; next_name = false; last_start = false; stack = [];
-    k = r_start } 
+    stream; k = r_start } 
 
 let decode_uncut d = d.uncut <- true; d.k d
 let rec decode d = match (d.uncut <- false; d.k d) with 
@@ -425,7 +436,8 @@ type encoder =
     mutable nest : int;              (* nesting level (String.length stack). *)
     mutable next_name : bool;         (* [true] if next encode should `Name. *)
     mutable last_start : bool;     (* [true] if last encode was [`As | `Os]. *)
-    mutable k :                                     (* decoder continuation. *)
+    mutable stream : bool;       (* [true] if several values can be written. *)
+    mutable k :                                     (* encoder continuation. *)
       encoder -> [ encode | uncut ] -> [ `Ok | `Partial ] }
 
 let o_rem e = e.o_max - e.o_pos + 1    (* remaining bytes to write in [e.o]. *)
@@ -563,8 +575,10 @@ let w_lexeme k e l =
       end
 
 let rec encode_ k e = function 
-| `Lexeme l -> 
-    if e.stack = [] then expect_end l else w_lexeme k e l
+| (`Lexeme l) as v -> 
+    if e.stack = [] then
+      if e.stream then encode_json e v else expect_end l
+      else w_lexeme k e l
 | `End as v -> 
     if e.stack = [] then flush k e else expect_lend (List.hd e.stack) v 
 | `White w -> 
@@ -574,15 +588,14 @@ let rec encode_ k e = function
 | `Comment (`M, c) ->
     writes "/*" 0 2 (writes c 0 (String.length c) (writes "*/" 0 2 k)) e
 | `Await -> `Ok 
-
-let rec encode_loop e = e.k <- encode_ encode_loop; `Ok
-let rec encode_json e = function  (* first [k] to start with [`Os] or [`As]. *)
+and  encode_loop e = e.k <- encode_ encode_loop; `Ok
+and encode_json e = function  (* first [k] to start with [`Os] or [`As]. *)
 | `Lexeme (`Os | `As as l) -> w_value true (* irrelevant *) l encode_loop e
 | `End | `Lexeme _ as v -> expect_json v 
 | `White _ | `Comment _ as v -> encode_ (fun e -> e.k <- encode_json; `Ok) e v
 | `Await -> `Ok
 
-let encoder ?(minify = true) dst =
+let encoder ?(stream=false) ?(minify = true) dst =
   let o, o_pos, o_max = match dst with 
   | `Manual -> "", 1, 0                            (* implies [o_rem e = 0]. *)
   | `Buffer _ 
@@ -590,7 +603,7 @@ let encoder ?(minify = true) dst =
   in
   { dst = (dst :> dst); minify; o; o_pos; o_max; buf = Buffer.create 30;
     stack = []; nest = 0; next_name = false; last_start = false; 
-    k = encode_json }
+    stream; k = encode_json }
 
 let encode e v = e.k e (v :> [ encode | uncut ])
 let encoder_dst e = e.dst
