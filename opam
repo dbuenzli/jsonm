@@ -3,7 +3,7 @@ maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
 homepage: "http://erratique.ch/software/jsonm"
 authors: ["Daniel Bünzli <daniel.buenzli i@erratique.ch>"]
 doc: "http://erratique.ch/software/jsonm/doc/Jsonm"
-tags: [ "json" "codec" ]
+tags: [ "json" "codec" "org:erratique" ]
 license: "BSD3"
 depends: [ "ocamlfind" "uutf" ]
 ocaml-version: [>= "3.12.0"]
