@@ -1,5 +1,6 @@
-version = "%%VERSION%%"
 description = "Non-blocking streaming JSON codec"
+version = "%%VERSION%%"
+requires = "uutf"
 archive(byte) = "jsonm.cma"
 archive(byte, plugin) = "jsonm.cma"
 archive(native) = "jsonm.cmxa"
