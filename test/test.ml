@@ -4,20 +4,20 @@
    %%NAME%% version %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-let str = Format.sprintf 
-let log f = Format.printf (f ^^ "@?") 
+let str = Format.sprintf
+let log f = Format.printf (f ^^ "@?")
 let fail fmt =
   let fail _ = failwith (Format.flush_str_formatter ()) in
   Format.kfprintf fail Format.str_formatter fmt
 
-let encoder_invalid () = 
+let encoder_invalid () =
   log "Invalid encodes.\n";
-  let rec encode_seq e = function 
+  let rec encode_seq e = function
   | v :: vs -> ignore (Jsonm.Uncut.encode e v); encode_seq e vs
   | [] -> ()
   in
   let seq ~invalid s =
-    let test ~minify = 
+    let test ~minify =
       let e = Jsonm.encoder ~minify (`Buffer (Buffer.create 256)) in
       try encode_seq e s; assert (not invalid) with
       | Invalid_argument _ as e -> if invalid then () else raise e
@@ -35,9 +35,9 @@ let encoder_invalid () =
   seq ~invalid:true [ `Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Ae];
   seq ~invalid:true [ `Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Oe];
   seq ~invalid:true [ `Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Ae];
-  seq ~invalid:true [ `Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Null; 
+  seq ~invalid:true [ `Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Null;
                       `Lexeme `Null; ];
-  seq ~invalid:true [ `Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Null; 
+  seq ~invalid:true [ `Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Null;
                       `Lexeme (`Name "c"); `Lexeme `Ae;];
   seq ~invalid:true [ `Lexeme `As; `Lexeme (`Oe) ];
   seq ~invalid:true [ `Lexeme `As; `Lexeme (`Name "b") ];
@@ -50,62 +50,62 @@ let encoder_invalid () =
   seq ~invalid:true [ `Lexeme `Os; `Lexeme `Oe; `End; `Lexeme `Os];
   ()
 
-let encoder_escapes () = 
+let encoder_escapes () =
   log "Encoder escapes.\n";
   let encode ascii sascii =
-    let b = Buffer.create 10 in 
-    let e = Jsonm.encoder (`Buffer b) in 
+    let b = Buffer.create 10 in
+    let e = Jsonm.encoder (`Buffer b) in
     let enc v = ignore (Jsonm.encode e (`Lexeme v)) in
-    List.iter enc [ `As; `String (Printf.sprintf "%c" (Char.chr ascii)); `Ae ]; 
+    List.iter enc [ `As; `String (Printf.sprintf "%c" (Char.chr ascii)); `Ae ];
     ignore (Jsonm.encode e `End);
     let json = Buffer.contents b in
     let exp = str "[\"%s\"]" sascii in
     if json <> exp then fail "found: %s exp: %s" json exp
   in
-  encode 0x22 "\\\""; 
+  encode 0x22 "\\\"";
   encode 0x5C "\\\\";
-  for i = 0x00 to 0x1F do 
+  for i = 0x00 to 0x1F do
     if i = 0x0A then encode i "\\n" else
     encode i (str "\\u00%02X" i)
   done;
   ()
 
-let decoder_encoding_guess () = 
+let decoder_encoding_guess () =
   log "Decoder encoding guesses.\n";
-  let test enc s = 
+  let test enc s =
     let d = Jsonm.decoder (`String s) in
     let enc' = (ignore (Jsonm.decode d); Jsonm.decoder_encoding d) in
-    if  enc' <> enc then 
+    if  enc' <> enc then
     fail "found: %s exp: %s"
       (Uutf.encoding_to_string enc') (Uutf.encoding_to_string enc)
   in
-  test `UTF_8 "[]"; 
-  test `UTF_8 "{}"; 
-  test `UTF_16BE "\x00\x5B\x00\x5D"; 
+  test `UTF_8 "[]";
+  test `UTF_8 "{}";
+  test `UTF_16BE "\x00\x5B\x00\x5D";
   test `UTF_16BE "\x00\x7B\x00\x7D";
-  test `UTF_16LE "\x5B\x00\x5D\x00"; 
+  test `UTF_16LE "\x5B\x00\x5D\x00";
   test `UTF_16LE "\x7B\x00\x7D\x00";
   ()
 
-let test_decode fnd exp = 
-  if fnd <> exp then fail "found: %a expected: %a" 
+let test_decode fnd exp =
+  if fnd <> exp then fail "found: %a expected: %a"
   Jsonm.Uncut.pp_decode fnd Jsonm.Uncut.pp_decode exp
 
-let test_seq decode src seq = 
-  let d = Jsonm.decoder (`String src) in 
+let test_seq decode src seq =
+  let d = Jsonm.decoder (`String src) in
   let rec loop d = function  [] -> ()
   | v :: vs -> test_decode (decode d) v; loop d vs
   in
-  loop d seq 
+  loop d seq
 
 let arr seq = [`Lexeme `As] @ seq @ [`Lexeme `Ae; `End; `End; `End ]
 
-let decoder_comments () = 
+let decoder_comments () =
   log "Decoder comments.\n";
   let test (s,c) src = test_seq Jsonm.Uncut.decode src (arr [`Comment (s,c)]) in
   let test_eoi v src = test_seq Jsonm.Uncut.decode  src
-    [`Lexeme `As; `Lexeme `Ae; v; `End]; 
-  in  
+    [`Lexeme `As; `Lexeme `Ae; v; `End];
+  in
   test (`M, "bla") "[/*bla*/]";
   test (`M, "b*") "[/*b**/]";
   test (`M, "b** /") "[/*b** /*/]";
@@ -149,132 +149,132 @@ let decoder_escapes () =
   test_ill (`Lone_hi_surrogate 0xD834) "<\xEF\xBF\xBD\nf>" (s "<\\uD834\\nf>");
   ()
 
-let decoder_strings () = 
+let decoder_strings () =
   log "Decoder strings.\n";
-  test_seq Jsonm.decode "[\"blibla\"]" (arr [ `Lexeme (`String "blibla") ]); 
-  test_seq Jsonm.decode "[\"bli\nbla\"]" 
-    (arr [`Error (`Illegal_string_uchar 0x0A); 
+  test_seq Jsonm.decode "[\"blibla\"]" (arr [ `Lexeme (`String "blibla") ]);
+  test_seq Jsonm.decode "[\"bli\nbla\"]"
+    (arr [`Error (`Illegal_string_uchar 0x0A);
           `Lexeme (`String "bli\xEF\xBF\xBDbla"); ]);
-  test_seq Jsonm.decode "[\"blabla" 
-    [`Lexeme `As; `Error (`Unclosed `Comment); `End; `End]; 
+  test_seq Jsonm.decode "[\"blabla"
+    [`Lexeme `As; `Error (`Unclosed `Comment); `End; `End];
   ()
 
 let decoder_literals () =
-  log "Decoder literals.\n"; 
-  test_seq Jsonm.decode "[null]" (arr [ `Lexeme `Null]); 
-  test_seq Jsonm.decode "[true]" (arr [ `Lexeme (`Bool true)]); 
-  test_seq Jsonm.decode "[false]" (arr [ `Lexeme (`Bool false)]); 
-  test_seq Jsonm.decode "[truee]" (arr [ `Error (`Illegal_literal "truee")]); 
-  test_seq Jsonm.decode "[tru" 
-    [ `Lexeme `As; `Error (`Illegal_literal "tru"); `Error (`Unclosed `As); 
+  log "Decoder literals.\n";
+  test_seq Jsonm.decode "[null]" (arr [ `Lexeme `Null]);
+  test_seq Jsonm.decode "[true]" (arr [ `Lexeme (`Bool true)]);
+  test_seq Jsonm.decode "[false]" (arr [ `Lexeme (`Bool false)]);
+  test_seq Jsonm.decode "[truee]" (arr [ `Error (`Illegal_literal "truee")]);
+  test_seq Jsonm.decode "[tru"
+    [ `Lexeme `As; `Error (`Illegal_literal "tru"); `Error (`Unclosed `As);
       `End; `End; `End ];
-  test_seq Jsonm.decode "{\"\" : tru" 
-    [ `Lexeme `Os; `Lexeme (`Name ""); `Error (`Illegal_literal "tru"); 
+  test_seq Jsonm.decode "{\"\" : tru"
+    [ `Lexeme `Os; `Lexeme (`Name ""); `Error (`Illegal_literal "tru");
       `Error (`Unclosed `Os); `End; `End; `End ];
   ()
 
-let decoder_numbers () = 
-  log "Decoder numbers.\n"; 
+let decoder_numbers () =
+  log "Decoder numbers.\n";
   test_seq Jsonm.decode "[1.0]" (arr [ `Lexeme (`Float 1.0)]);
   test_seq Jsonm.decode "[1e12]" (arr [ `Lexeme (`Float 1e12)]);
   test_seq Jsonm.decode "[-1e12]" (arr [ `Lexeme (`Float ~-.1e12)]);
   test_seq Jsonm.decode "[-1eee2]" (arr [ `Error (`Illegal_number "-1eee2")]);
-  test_seq Jsonm.decode "[-1ee2" 
-    [ `Lexeme `As; `Error (`Illegal_number "-1ee2"); `Error (`Unclosed `As); 
+  test_seq Jsonm.decode "[-1ee2"
+    [ `Lexeme `As; `Error (`Illegal_number "-1ee2"); `Error (`Unclosed `As);
       `End; `End; `End ];
-  test_seq Jsonm.decode "{\"\" : -1ee2" 
-    [ `Lexeme `Os; `Lexeme (`Name ""); `Error (`Illegal_number "-1ee2"); 
+  test_seq Jsonm.decode "{\"\" : -1ee2"
+    [ `Lexeme `Os; `Lexeme (`Name ""); `Error (`Illegal_number "-1ee2");
       `Error (`Unclosed `Os); `End; `End; `End ];
   ()
 
-let decoder_arrays () = 
+let decoder_arrays () =
   log "Decoder arrays.\n";
   test_seq Jsonm.decode "[]" (arr []);
-  test_seq Jsonm.decode "[" 
+  test_seq Jsonm.decode "["
     [`Lexeme `As; `Error (`Unclosed `As); `End; `End; `End];
-  test_seq Jsonm.decode "[null" 
-    [`Lexeme `As; `Lexeme `Null; `Error (`Unclosed `As); 
+  test_seq Jsonm.decode "[null"
+    [`Lexeme `As; `Lexeme `Null; `Error (`Unclosed `As);
      `End; `End; `End];
-  test_seq Jsonm.decode "[null," 
-    [`Lexeme `As; `Lexeme `Null; `Error (`Expected (`Value)); 
+  test_seq Jsonm.decode "[null,"
+    [`Lexeme `As; `Lexeme `Null; `Error (`Expected (`Value));
      `Error (`Unclosed `As); `End; `End; `End];
-  test_seq Jsonm.decode "[null { null]" 
-    [`Lexeme `As; `Lexeme `Null; `Error (`Expected (`Aval false)); 
+  test_seq Jsonm.decode "[null { null]"
+    [`Lexeme `As; `Lexeme `Null; `Error (`Expected (`Aval false));
      `Lexeme `Ae; `End; `End; `End];
-  test_seq Jsonm.decode "[null { null,null]" 
-    [`Lexeme `As; `Lexeme `Null; `Error (`Expected (`Aval false)); 
+  test_seq Jsonm.decode "[null { null,null]"
+    [`Lexeme `As; `Lexeme `Null; `Error (`Expected (`Aval false));
      `Lexeme `Null; `Lexeme `Ae; `End; `End; `End];
-  test_seq Jsonm.decode "[; null]" 
+  test_seq Jsonm.decode "[; null]"
     [`Lexeme `As; `Error (`Expected (`Aval true));
      `Lexeme `Ae; `End; `End; `End];
-  test_seq Jsonm.decode "[; , null]" 
+  test_seq Jsonm.decode "[; , null]"
     [`Lexeme `As; `Error (`Expected (`Aval true)); `Lexeme `Null;
      `Lexeme `Ae; `End; `End; `End];
   ()
 
 let decoder_objects () =
   log "Decoder objects.\n";
-  test_seq Jsonm.decode "{" 
+  test_seq Jsonm.decode "{"
     [`Lexeme `Os; `Error (`Unclosed `Os); `End; `End; `End];
-  test_seq Jsonm.decode "{null" 
-    [`Lexeme `Os; `Error (`Expected (`Omem true)); `Error (`Unclosed `Os); 
+  test_seq Jsonm.decode "{null"
+    [`Lexeme `Os; `Error (`Expected (`Omem true)); `Error (`Unclosed `Os);
      `End; `End; `End];
-  test_seq Jsonm.decode "{ \"b\" " 
-    [`Lexeme `Os; `Lexeme (`Name "b"); `Error (`Expected (`Name_sep)); 
+  test_seq Jsonm.decode "{ \"b\" "
+    [`Lexeme `Os; `Lexeme (`Name "b"); `Error (`Expected (`Name_sep));
      `Error (`Unclosed `Os); `End; `End; `End];
-  test_seq Jsonm.decode "{ \"b\" : ] null]" 
-    [`Lexeme `Os; `Lexeme (`Name "b"); `Error (`Expected (`Value)); 
+  test_seq Jsonm.decode "{ \"b\" : ] null]"
+    [`Lexeme `Os; `Lexeme (`Name "b"); `Error (`Expected (`Value));
      `Error (`Unclosed `Os); `End; `End; `End];
   test_seq Jsonm.decode "{ \"b\" : null"
-    [`Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Null; 
+    [`Lexeme `Os; `Lexeme (`Name "b"); `Lexeme `Null;
      `Error (`Unclosed `Os); `End; `End; `End];
-  test_seq Jsonm.decode "{; null}" 
-    [`Lexeme `Os; `Error (`Expected (`Omem true)); 
+  test_seq Jsonm.decode "{; null}"
+    [`Lexeme `Os; `Error (`Expected (`Omem true));
      `Lexeme `Oe; `End; `End; `End];
-  test_seq Jsonm.decode "{ ill : null, \"bli\" : null}" 
-    [`Lexeme `Os; `Error (`Expected (`Omem true)); `Lexeme (`Name "bli"); 
+  test_seq Jsonm.decode "{ ill : null, \"bli\" : null}"
+    [`Lexeme `Os; `Error (`Expected (`Omem true)); `Lexeme (`Name "bli");
      `Lexeme `Null; `Lexeme `Oe; `End; `End; `End];
-  test_seq Jsonm.decode "{ \"bli\" : null ill : null }" 
-    [`Lexeme `Os; `Lexeme (`Name "bli"); 
-     `Lexeme `Null; `Error (`Expected (`Omem false)); 
+  test_seq Jsonm.decode "{ \"bli\" : null ill : null }"
+    [`Lexeme `Os; `Lexeme (`Name "bli");
+     `Lexeme `Null; `Error (`Expected (`Omem false));
      `Lexeme `Oe; `End; `End; `End];
-  test_seq Jsonm.decode "{ \"bli\" : null, ill : null }" 
-    [`Lexeme `Os; `Lexeme (`Name "bli"); 
-     `Lexeme `Null; `Error (`Expected `Name); 
+  test_seq Jsonm.decode "{ \"bli\" : null, ill : null }"
+    [`Lexeme `Os; `Lexeme (`Name "bli");
+     `Lexeme `Null; `Error (`Expected `Name);
      `Lexeme `Oe; `End; `End; `End];
   ()
 
-let decoder_json_text () = 
+let decoder_json_text () =
   log "Decoder JSON text.\n";
-  test_seq Jsonm.decode "a : null {}" 
+  test_seq Jsonm.decode "a : null {}"
     [ `Error (`Expected `Json); `Lexeme `Os; `Lexeme `Oe];
-  test_seq Jsonm.decode "a : null []" 
+  test_seq Jsonm.decode "a : null []"
     [ `Error (`Expected `Json); `Lexeme `As; `Lexeme `Ae];
   ()
 
-let decoder_bom () = 
+let decoder_bom () =
   log "Decoder BOM.\n";
   let seq = [`Error `Illegal_BOM; `Lexeme `Os; `Lexeme `Oe] in
   test_seq Jsonm.decode "\xEF\xBB\xBF  {}" seq;
-  test_seq Jsonm.decode "\xFE\xFF\x00\x7B\x00\x7D" seq; 
+  test_seq Jsonm.decode "\xFE\xFF\x00\x7B\x00\x7D" seq;
   test_seq Jsonm.decode "\xFE\xFF\x00\x7B\x00\x7D\x00" seq
-  
+
 let decoder_eoi () =
   log "Decoder end of input.\n";
   test_seq Jsonm.decode "" [`Error (`Expected `Json) ];
-  test_seq Jsonm.decode "{} a : null" 
+  test_seq Jsonm.decode "{} a : null"
     [ `Lexeme `Os; `Lexeme `Oe; `Error (`Expected `Eoi); ];
-  test_seq Jsonm.decode "[] a : null " 
+  test_seq Jsonm.decode "[] a : null "
     [ `Lexeme `As; `Lexeme `Ae; `Error (`Expected `Eoi); ];
   ()
-    
-let trip () = 
+
+let trip () =
   log "Codec round-trips.\n";
-  let trip s = 
+  let trip s =
     let b = Buffer.create (String.length s) in
-    let d = Jsonm.decoder (`String s) in 
+    let d = Jsonm.decoder (`String s) in
     let e = Jsonm.encoder (`Buffer b) in
-    let rec loop d e = match Jsonm.decode d with 
+    let rec loop d e = match Jsonm.decode d with
     | `Lexeme _ as v -> ignore (Jsonm.encode e v); loop d e
     | `End as v -> ignore (Jsonm.encode e v)
     | `Error e -> fail "err: %a" Jsonm.pp_error e
@@ -282,7 +282,7 @@ let trip () =
     in
     loop d e;
     let trips = Buffer.contents b in
-    if trips <> s then 
+    if trips <> s then
     fail "fnd: %s@\nexp: %s@\n" trips s
   in
   trip "[null,null,0.1,true,false,[true,false]]";
@@ -293,7 +293,7 @@ let trip () =
      value [-2^53;2^53] do trip. *)
   trip "[9007199254740992,-9007199254740992]";
   ()
-    
+
 let test () =
   Printexc.record_backtrace true;
   encoder_invalid ();
@@ -303,8 +303,8 @@ let test () =
   decoder_comments ();
   decoder_literals ();
   decoder_numbers ();
-  decoder_arrays (); 
-  decoder_objects (); 
+  decoder_arrays ();
+  decoder_objects ();
   decoder_json_text ();
   decoder_bom ();
   decoder_eoi ();
@@ -320,7 +320,7 @@ let () = if not (!Sys.interactive) then test ()
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met:
-     
+
    1. Redistributions of source code must retain the above copyright
       notice, this list of conditions and the following disclaimer.
 
