@@ -1,14 +1,17 @@
-opam-version: "1"
+opam-version: "1.2"
 maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
-homepage: "http://erratique.ch/software/jsonm"
 authors: ["Daniel Bünzli <daniel.buenzli i@erratique.ch>"]
+homepage: "http://erratique.ch/software/jsonm"
 doc: "http://erratique.ch/software/jsonm/doc/Jsonm"
+dev-repo: "http://erratique.ch/repos/jsonm.git"
+bug-reports: "https://github.com/dbuenzli/jsonm/issues"
 tags: [ "json" "codec" "org:erratique" ]
 license: "BSD3"
 depends: [ "ocamlfind" "uutf" ]
-ocaml-version: [>= "3.12.0"]
+available: [ ocaml-version >= "3.12.0"]
 build: 
 [
-  ["./pkg/pkg-git" ] 
-  ["./pkg/build" "true" ]
+  [ "ocaml" "pkg/git.ml" ]
+  [ "ocaml" "pkg/build.ml" "native=%{ocaml-native}%"
+                           "native-dynlink=%{ocaml-native-dynlink}%" ]
 ]
