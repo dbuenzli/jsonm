@@ -4,4 +4,7 @@ dist
 *~
 \.\#*
 \#*#
+*.native
+*.install
+*.byte
 CLOCK.org
