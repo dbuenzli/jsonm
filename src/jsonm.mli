@@ -8,7 +8,7 @@
 
     [Jsonm] is a non-blocking streaming codec to
     {{!section:decode}decode} and {{!section:encode}encode} the
-    {{:http://tools.ietf.org/html/rfc4627}JSON} data format. It can
+    {{:http://tools.ietf.org/html/rfc7159}JSON} data format. It can
     process JSON text without blocking on IO and without a complete
     in-memory representation of the data.
 
@@ -21,9 +21,9 @@
     {e Release %%VERSION%% - %%AUTHORS%% }
     {3 References}
     {ul
-    {- D. Crockford
-    {e {{:http://tools.ietf.org/html/rfc4627}JSON The application/json Media
-    Type for JavaScript Object Notation (JSON)}}, 2006.}} *)
+    {- T. Bray Ed.
+    {e {{:http://tools.ietf.org/html/rfc7159}The JavaScript Object Notation
+    (JSON) Data Interchange Format}, 2014}}} *)
 
 (** {1:datamodel JSON data model} *)
 
@@ -44,7 +44,7 @@ type lexeme = [
     A {e well-formed} sequence of lexemes belongs to the language of
     the [json] grammar:
 {[
-  json = object / array
+  json = value 
 object = `Os *member `Oe
 member = (`Name s) value
  array = `As *value `Ae
@@ -112,7 +112,7 @@ val decoder :?encoding:[< encoding] -> [< src] -> decoder
     [encoding] specifies the character encoding of the data. If unspecified
     the encoding is guessed as
     {{:http://tools.ietf.org/html/rfc4627#section-3}suggested} by
-    the standard. *)
+    the old RFC4627 standard. *)
 
 val decode : decoder -> [> `Await | `Lexeme of lexeme | `End | `Error of error ]
 (** [decode d] is:

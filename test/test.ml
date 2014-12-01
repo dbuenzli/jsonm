@@ -24,8 +24,13 @@ let encoder_invalid () =
     in
     test ~minify:true; test ~minify:false
   in
-  seq ~invalid:true [ `Lexeme `Oe];
-  seq ~invalid:true [ `Lexeme `Null];
+  seq ~invalid:false [ `Lexeme `Null];
+  seq ~invalid:false [ `Lexeme (`Bool true)];
+  seq ~invalid:false [ `Lexeme (`Bool false)];
+  seq ~invalid:false [ `Lexeme (`Float 1.0)];
+  seq ~invalid:false [ `Lexeme (`String "bla")];
+  seq ~invalid:true  [ `Lexeme `Ae];
+  seq ~invalid:true  [ `Lexeme `Oe];
   seq ~invalid:true [ `Lexeme (`Name "b")];
   seq ~invalid:true [ `White "    "; `Lexeme `Oe];
   seq ~invalid:true [ `Lexeme `Os; `Lexeme `Ae];
@@ -151,6 +156,8 @@ let decoder_escapes () =
 
 let decoder_strings () =
   log "Decoder strings.\n";
+  test_seq Jsonm.decode "\"\"" [`Lexeme (`String "")];
+  test_seq Jsonm.decode "\"heyho\"" [`Lexeme (`String "heyho")];
   test_seq Jsonm.decode "[\"blibla\"]" (arr [ `Lexeme (`String "blibla") ]);
   test_seq Jsonm.decode "[\"bli\nbla\"]"
     (arr [`Error (`Illegal_string_uchar 0x0A);
@@ -161,6 +168,9 @@ let decoder_strings () =
 
 let decoder_literals () =
   log "Decoder literals.\n";
+  test_seq Jsonm.decode "null" [`Lexeme `Null];
+  test_seq Jsonm.decode "true" [`Lexeme (`Bool true)];
+  test_seq Jsonm.decode "false" [`Lexeme (`Bool false)];
   test_seq Jsonm.decode "[null]" (arr [ `Lexeme `Null]);
   test_seq Jsonm.decode "[true]" (arr [ `Lexeme (`Bool true)]);
   test_seq Jsonm.decode "[false]" (arr [ `Lexeme (`Bool false)]);
@@ -175,6 +185,8 @@ let decoder_literals () =
 
 let decoder_numbers () =
   log "Decoder numbers.\n";
+  test_seq Jsonm.decode "1.0" [`Lexeme (`Float 1.0)];
+  test_seq Jsonm.decode "-1.0" [`Lexeme (`Float ~-.1.0)];
   test_seq Jsonm.decode "[1.0]" (arr [ `Lexeme (`Float 1.0)]);
   test_seq Jsonm.decode "[1e12]" (arr [ `Lexeme (`Float 1e12)]);
   test_seq Jsonm.decode "[-1e12]" (arr [ `Lexeme (`Float ~-.1e12)]);
@@ -247,9 +259,15 @@ let decoder_objects () =
 let decoder_json_text () =
   log "Decoder JSON text.\n";
   test_seq Jsonm.decode "a : null {}"
-    [ `Error (`Expected `Json); `Lexeme `Os; `Lexeme `Oe];
+    [ `Error (`Expected `Json);
+      `Error (`Expected `Json);
+      `Lexeme `Null;
+      `Error (`Expected `Eoi)];
   test_seq Jsonm.decode "a : null []"
-    [ `Error (`Expected `Json); `Lexeme `As; `Lexeme `Ae];
+    [ `Error (`Expected `Json);
+      `Error (`Expected `Json);
+      `Lexeme `Null;
+      `Error (`Expected `Eoi)];
   ()
 
 let decoder_bom () =
@@ -285,7 +303,13 @@ let trip () =
     if trips <> s then
     fail "fnd: %s@\nexp: %s@\n" trips s
   in
-  trip "[null,null,0.1,true,false,[true,false]]";
+  trip "null";
+  trip "true";
+  trip "false";
+  trip "2";
+  trip "0.5";
+  trip "\"heyho\"";
+  trip "[null,null,0.5,true,false,[true,false]]";
   trip "{\"a\":[1,2,4,5,[true,false]],\"b\":{}}";
   trip "{\"a\":[1,2,4,5,[true,{\"c\":[null]}]],\"b\":{}}";
   trip "{\"a\":[1,2,4,5,[true,{\"c\":[\"\\nbli\",5,6]}]],\"b\":{}}";

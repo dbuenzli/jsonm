@@ -155,7 +155,7 @@ let pp_error ppf = function
     | `Aval false -> pp ppf "value@ separator@ or@ array@ end@ (','@ or@ ']')@]"
     | `Omem true -> pp ppf "member@ name@ or@ object@ end@ ('\"'@ or@ '}')@]"
     | `Omem false ->pp ppf "value@ separator@ or@ object@ end@ (','@ or@ '}')@]"
-    | `Json -> pp ppf "JSON@ text@ ('{'@ or@ '[')@]"
+    | `Json -> pp ppf "JSON@ text (JSON value)@]"
     | `Eoi -> pp ppf "end@ of@ input@]"
     end
 
@@ -367,9 +367,13 @@ let rec r_lexeme d = match d.stack with
     r_white (r_obj_value r_lexeme) d
 | [] -> r_white (r_end r_lexeme) d
 
-let rec r_json k d =                       (* {begin-array} / {begin-object} *)
-  let err k d = spos d; discard_to u_lbrack u_lbrace err_exp_json (r_json k)d in
-  if d.c = u_lbrack || d.c = u_lbrace then r_value err k d else err k d
+let rec discard_to_white err k d =
+  if is_white d.c || d.c = ux_eoi then ret err k d else
+  (epos d; readc (discard_to_white err k) d)
+
+let rec r_json k d =                                              (* {value} *)
+  let err k d = spos d; discard_to_white err_exp_json (r_white (r_json k)) d in
+  r_value err k d
 
 let r_start d =                                            (* start of input *)
   let bom k d = if Uutf.decoder_removed_bom d.u then ret err_bom k d else k d in
@@ -408,7 +412,9 @@ let expect_end l = expect "`End" (`Lexeme l)
 let expect_mem_value l = expect "any `Lexeme but `Name, `Oe or `Ae" (`Lexeme l)
 let expect_arr_value_ae l = expect "any `Lexeme but `Name or `Oe" (`Lexeme l)
 let expect_name_or_oe l = expect "`Lexeme (`Name _ | `Oe)" (`Lexeme l)
-let expect_json v = expect "`Lexeme (`As | `Os)" v
+let expect_json v =
+  expect "`Lexeme (`Null | `Bool _ | `Float _ | `String _ | `As | `Os)" v
+
 let expect_lend lstart v  =
   expect (if lstart = `As then "`Lexeme `Ae" else "`Lexeme `Oe") v
 
@@ -577,7 +583,8 @@ let rec encode_ k e = function
 
 let rec encode_loop e = e.k <- encode_ encode_loop; `Ok
 let rec encode_json e = function  (* first [k] to start with [`Os] or [`As]. *)
-| `Lexeme (`Os | `As as l) -> w_value true (* irrelevant *) l encode_loop e
+| `Lexeme (`Null | `Bool _ | `Float _ | `String _ | `As | `Os as l) ->
+    w_value false l encode_loop e
 | `End | `Lexeme _ as v -> expect_json v
 | `White _ | `Comment _ as v -> encode_ (fun e -> e.k <- encode_json; `Ok) e v
 | `Await -> `Ok
