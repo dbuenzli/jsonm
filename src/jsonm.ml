@@ -373,7 +373,7 @@ let rec discard_to_white err k d =
 
 let rec r_json k d =                                              (* {value} *)
   let err k d = spos d; discard_to_white err_exp_json (r_white (r_json k)) d in
-  r_value err k d
+  if d.c <> ux_eoi then r_value err k d else ret err_exp_json k d
 
 let r_start d =                                            (* start of input *)
   let bom k d = if Uutf.decoder_removed_bom d.u then ret err_bom k d else k d in

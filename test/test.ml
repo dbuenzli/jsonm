@@ -98,7 +98,8 @@ let test_decode fnd exp =
 
 let test_seq decode src seq =
   let d = Jsonm.decoder (`String src) in
-  let rec loop d = function  [] -> ()
+  let rec loop d = function
+  | [] ->  if decode d <> `End then fail "decoder not at the `End"; ()
   | v :: vs -> test_decode (decode d) v; loop d vs
   in
   loop d seq
@@ -258,24 +259,29 @@ let decoder_objects () =
 
 let decoder_json_text () =
   log "Decoder JSON text.\n";
+  test_seq Jsonm.decode "a" [ `Error (`Expected `Json);
+                              `Error (`Expected `Json); `End ];
+  test_seq Jsonm.decode "" [ `Error (`Expected `Json); `End ];
   test_seq Jsonm.decode "a : null {}"
     [ `Error (`Expected `Json);
       `Error (`Expected `Json);
       `Lexeme `Null;
-      `Error (`Expected `Eoi)];
+      `Error (`Expected `Eoi); `End];
   test_seq Jsonm.decode "a : null []"
     [ `Error (`Expected `Json);
       `Error (`Expected `Json);
       `Lexeme `Null;
-      `Error (`Expected `Eoi)];
+      `Error (`Expected `Eoi); `End];
   ()
 
 let decoder_bom () =
   log "Decoder BOM.\n";
-  let seq = [`Error `Illegal_BOM; `Lexeme `Os; `Lexeme `Oe] in
+  let seq = [`Error `Illegal_BOM; `Lexeme `Os; `Lexeme `Oe; `End] in
   test_seq Jsonm.decode "\xEF\xBB\xBF  {}" seq;
   test_seq Jsonm.decode "\xFE\xFF\x00\x7B\x00\x7D" seq;
-  test_seq Jsonm.decode "\xFE\xFF\x00\x7B\x00\x7D\x00" seq
+  test_seq Jsonm.decode "\xFF\xFE\x7B\x00\x7D\x00" seq;
+  ()
+
 
 let decoder_eoi () =
   log "Decoder end of input.\n";
