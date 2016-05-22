@@ -1,4 +1,4 @@
-<**/*.{ml,mli}> : bin_annot, package(uutf)
+true : bin_annot, package(uutf)
 <src> : include
 <test> : include
 <test/jsontrip.{byte,native}> : package(unix), package(uutf)
