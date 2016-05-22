@@ -1,4 +1,5 @@
 
+- Relicensed from BSD3 to ISC.
 - Fix `Jsonm.decode` not eventually returning `End on toplevel
   decode error.
 - Support for RFC 7195/ECMA-404. This means that any JSON value can
