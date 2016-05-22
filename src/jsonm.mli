@@ -18,7 +18,7 @@
     Consult the {{!datamodel}data model}, {{!limitations}limitations}
     and {{!examples}examples} of use.
 
-    {e Release %%VERSION%% - %%AUTHORS%% }
+    {e %%VERSION%% - {{:%%PKG_HOMEPAGE%% }homepage}}
     {3 References}
     {ul
     {- T. Bray Ed.

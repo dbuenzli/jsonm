@@ -1,4 +1,6 @@
 
+
+- Build depend on topkg.
 - Relicensed from BSD3 to ISC.
 - Fix `Jsonm.decode` not eventually returning `End on toplevel
   decode error.
