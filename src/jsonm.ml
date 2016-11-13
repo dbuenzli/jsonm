@@ -35,6 +35,7 @@ let u_minus  = 0x2D (* - *)
 let u_slash  = 0x2F (* / *)
 let u_bslash = 0x5C (* \ *)
 let u_times  = 0x2A (* * *)
+let u_rep = Uchar.to_int Uutf.u_rep
 
 let must_escape u = u <= 0x1F || u = 0x22 || u = 0x5C
 let is_digit u = 0x30 <= u && u <= 0x39
@@ -69,12 +70,12 @@ let pp_lexeme ppf = function
 type error = [
 | `Illegal_BOM
 | `Illegal_escape of
-    [ `Not_hex_uchar of int
-    | `Not_esc_uchar of int
+    [ `Not_hex_uchar of Uchar.t
+    | `Not_esc_uchar of Uchar.t
     | `Not_lo_surrogate of int
     | `Lone_lo_surrogate of int
     | `Lone_hi_surrogate of int ]
-| `Illegal_string_uchar of int
+| `Illegal_string_uchar of Uchar.t
 | `Illegal_bytes of string
 | `Illegal_literal of string
 | `Illegal_number of string
@@ -85,12 +86,12 @@ type error = [
     | `Omem of bool (* [true] if first object member *) ]]
 
 let err_bom = `Error (`Illegal_BOM)
-let err_not_hex u = `Error (`Illegal_escape (`Not_hex_uchar u))
-let err_not_esc u = `Error (`Illegal_escape (`Not_esc_uchar u))
+let err_not_hex u = `Error (`Illegal_escape (`Not_hex_uchar (Uchar.of_int u)))
+let err_not_esc u = `Error (`Illegal_escape (`Not_esc_uchar (Uchar.of_int u)))
 let err_not_lo p = `Error (`Illegal_escape (`Not_lo_surrogate p))
 let err_lone_lo p = `Error (`Illegal_escape (`Lone_lo_surrogate p))
 let err_lone_hi p = `Error (`Illegal_escape (`Lone_hi_surrogate p))
-let err_str_char u = `Error (`Illegal_string_uchar u)
+let err_str_char u = `Error (`Illegal_string_uchar (Uchar.of_int u))
 let err_bytes bs = `Error (`Illegal_bytes bs)
 let err_unclosed_comment = `Error (`Unclosed `Comment)
 let err_unclosed_string = `Error (`Unclosed `String)
@@ -109,11 +110,12 @@ let err_exp_obj_nxt = `Error (`Expected (`Omem false))
 let err_exp_json = `Error (`Expected `Json)
 let err_exp_eoi = `Error (`Expected `Eoi)
 
+let pp_cp ppf u = pp ppf "U+%04X" u
 let pp_uchar ppf u =
-  if u <= 0x1F (* most control chars *) then Uutf.pp_cp ppf u else
+  if Uchar.to_int u <= 0x1F (* most control chars *) then Uchar.dump ppf u else
   let b = Buffer.create 4 in
   Uutf.Buffer.add_utf_8 b u;
-  pp ppf "'%s' (%a)" (Buffer.contents b) Uutf.pp_cp u
+  pp ppf "'%s' (%a)" (Buffer.contents b) Uchar.dump u
 
 let pp_error ppf = function
 | `Illegal_BOM -> pp ppf "@[illegal@ initial@ BOM@ in@ character@ stream@]"
@@ -122,9 +124,9 @@ let pp_error ppf = function
     begin match r with
     | `Not_hex_uchar u -> pp ppf "%a@ not@ a@ hex@ digit@]" pp_uchar u
     | `Not_esc_uchar u -> pp ppf "%a@ not@ an@ escaped@ character@]" pp_uchar u
-    | `Lone_lo_surrogate p -> pp ppf "%a@ lone@ low@ surrogate@]" Uutf.pp_cp p
-    | `Lone_hi_surrogate p -> pp ppf "%a@ lone@ high@ surrogate@]" Uutf.pp_cp p
-    | `Not_lo_surrogate p -> pp ppf "%a@ not@ a@ low@ surrogate@]" Uutf.pp_cp p
+    | `Lone_lo_surrogate p -> pp ppf "%a@ lone@ low@ surrogate@]" pp_cp p
+    | `Lone_hi_surrogate p -> pp ppf "%a@ lone@ high@ surrogate@]" pp_cp p
+    | `Not_lo_surrogate p -> pp ppf "%a@ not@ a@ low@ surrogate@]" pp_cp p
     end
 | `Illegal_string_uchar u ->
     pp ppf "@[illegal@ character@ in@ JSON@ string@ (%a)@]" pp_uchar u
@@ -183,7 +185,7 @@ type decoder =
     mutable s_col : int;                         (* last saved start column. *)
     mutable e_line : int;                            (* last saved end line. *)
     mutable e_col : int;                           (* last saved end column. *)
-    mutable c : Uutf.uchar;                          (* character lookahead. *)
+    mutable c : int;                                 (* character lookahead. *)
     mutable stack :                     (* stack of open arrays and objects. *)
       [ `As of pos | `Os of pos ] list;
     mutable next_name : bool;    (* [true] if next decode should be [`Name]. *)
@@ -191,8 +193,8 @@ type decoder =
     mutable k :                                     (* decoder continuation. *)
       decoder -> [ decode | uncut ] }
 
-let baddc d c = Uutf.Buffer.add_utf_8 d.buf c
-let badd d = Uutf.Buffer.add_utf_8 d.buf d.c
+let baddc d c = Uutf.Buffer.add_utf_8 d.buf (Uchar.unsafe_of_int c)
+let badd d = Uutf.Buffer.add_utf_8 d.buf (Uchar.unsafe_of_int d.c)
 let buf d = let t = Buffer.contents d.buf in (Buffer.clear d.buf; t)
 let dpos d = Uutf.decoder_line d.u, Uutf.decoder_col d.u
 let spos d = d.s_line <- Uutf.decoder_line d.u; d.s_col <- Uutf.decoder_col d.u
@@ -209,10 +211,10 @@ let dpop d = match (spos d; epos d; d.stack) with
 let ret_eoi d = `End
 let ret (v : [< decode | uncut]) k d = d.k <- k; v
 let rec readc k d = match Uutf.decode d.u with
-| `Uchar u -> d.c <- u; k d
+| `Uchar u -> d.c <- (Uchar.to_int u); k d
 | `End -> d.c <- ux_eoi; k d
 | `Await -> ret `Await (readc k) d
-| `Malformed bs -> d.c <- Uutf.u_rep; epos d; ret (err_bytes bs) k d
+| `Malformed bs -> d.c <- u_rep; epos d; ret (err_bytes bs) k d
 
 let rec r_scomment k d =               (* single line comment. // was eaten. *)
   if (d.c <> u_nl && d.c <> ux_eoi) then (badd d; readc (r_scomment k) d) else
@@ -247,7 +249,7 @@ let rec r_ws k d = if (is_white d.c) then readc (r_ws k) d else k d  (* {ws} *)
 let r_white k d = if d.uncut then r_white_uncut k d else r_ws k d
 
 let rec r_u_escape hi u count k d =                      (* unicode escapes. *)
-  let error err k d = baddc d Uutf.u_rep; ret err k d in
+  let error err k d = baddc d u_rep; ret err k d in
   if count > 0 then
     if not (is_hex_digit d.c) then (epos d; error (err_not_hex d.c) (readc k) d)
     else
@@ -278,14 +280,14 @@ and r_escape k d = match d.c with
 | 0x72 (* r *) -> baddc d 0x0D; readc k d
 | 0x74 (* t *) -> baddc d 0x09; readc k d
 | 0x75 (* u *) -> readc (r_u_escape None 0 4 k) d
-| c -> epos d; baddc d Uutf.u_rep; ret (err_not_esc c) (readc k) d
+| c -> epos d; baddc d u_rep; ret (err_not_esc c) (readc k) d
 
 let rec r_string k d =                                (* {string}, '' eaten. *)
   if d.c = ux_eoi then (epos d; ret err_unclosed_string ret_eoi d) else
   if not (must_escape d.c) then (badd d; readc (r_string k) d) else
   if d.c = u_quot then (epos d; readc k d) else
   if d.c = u_bslash then readc (r_escape (r_string k)) d else
-  (epos d; baddc d Uutf.u_rep; ret (err_str_char d.c) (readc (r_string k)) d)
+  (epos d; baddc d u_rep; ret (err_str_char d.c) (readc (r_string k)) d)
 
 let rec r_float k d =                                            (* {number} *)
   if not (is_val_sep d.c) && d.c <> ux_eoi
@@ -379,8 +381,9 @@ let r_start d =                                            (* start of input *)
   let bom k d = if Uutf.decoder_removed_bom d.u then ret err_bom k d else k d in
   readc (bom (r_white (r_json r_lexeme))) d
 
+let nln = `ASCII (Uchar.unsafe_of_int 0x000A)
 let decoder ?encoding src =
-  let u = Uutf.decoder ?encoding ~nln:(`ASCII 0x000A) src in
+  let u = Uutf.decoder ?encoding ~nln src in
   { u; buf = Buffer.create 1024; uncut = false;
     s_line = 1; s_col = 0; e_line = 1; e_col = 0;
     c = ux_soi; next_name = false; last_start = false; stack = [];

@@ -132,6 +132,8 @@ let decoder_escapes () =
   let test_ill ill str src = test_seq Jsonm.decode src
     (arr [`Error (`Illegal_escape ill); `Lexeme (`String str)])
   in
+  let not_esc_uchar u = `Not_esc_uchar (Uchar.of_int u) in
+  let not_hex_uchar u = `Not_hex_uchar (Uchar.of_int u) in
   let s s = Printf.sprintf "[\"%s\"]" s in
   test "<\">" (s "<\\\">");
   test "<\\>" (s "<\\\\>");
@@ -142,13 +144,13 @@ let decoder_escapes () =
   test "<\r>" (s "<\\r>");
   test "<\t>" (s "<\\t>");
   test "<\xF0\x9D\x84\x9E><\xE6\xB0\xB4>" (s "<\\uD834\\uDd1E><\\u6C34>");
-  test_ill (`Not_esc_uchar 0x61) "<\xEF\xBF\xBD>" (s "<\\a>");
-  test_ill (`Not_esc_uchar 0x31) "<\xEF\xBF\xBD>" (s "<\\1>");
-  test_ill (`Not_esc_uchar 0xFFFD) "<\xEF\xBF\xBD>" (s "<\\\xEF\xBF\xBD>");
-  test_ill (`Not_hex_uchar 0x47) "<\xEF\xBF\xBDAF1>" (s "<\\uGAF1>");
-  test_ill (`Not_hex_uchar 0x47) "<\xEF\xBF\xBDF1>" (s "<\\uAGF1>");
-  test_ill (`Not_hex_uchar 0x67) "<\xEF\xBF\xBD1>" (s "<\\uAFg1>");
-  test_ill (`Not_hex_uchar 0x67) "<\xEF\xBF\xBD>" (s "<\\uAF1g>");
+  test_ill (not_esc_uchar 0x61) "<\xEF\xBF\xBD>" (s "<\\a>");
+  test_ill (not_esc_uchar 0x31) "<\xEF\xBF\xBD>" (s "<\\1>");
+  test_ill (not_esc_uchar 0xFFFD) "<\xEF\xBF\xBD>" (s "<\\\xEF\xBF\xBD>");
+  test_ill (not_hex_uchar 0x47) "<\xEF\xBF\xBDAF1>" (s "<\\uGAF1>");
+  test_ill (not_hex_uchar 0x47) "<\xEF\xBF\xBDF1>" (s "<\\uAGF1>");
+  test_ill (not_hex_uchar 0x67) "<\xEF\xBF\xBD1>" (s "<\\uAFg1>");
+  test_ill (not_hex_uchar 0x67) "<\xEF\xBF\xBD>" (s "<\\uAF1g>");
   test_ill (`Not_lo_surrogate 0x6C34) "<\xEF\xBF\xBD>" (s "<\\uD834\\u6C34>");
   test_ill (`Lone_hi_surrogate 0xD834) "<\xEF\xBF\xBDbla>" (s "<\\uD834bla>");
   test_ill (`Lone_lo_surrogate 0xDD1E) "<\xEF\xBF\xBDbla>" (s "<\\uDd1Ebla>");
@@ -161,7 +163,7 @@ let decoder_strings () =
   test_seq Jsonm.decode "\"heyho\"" [`Lexeme (`String "heyho")];
   test_seq Jsonm.decode "[\"blibla\"]" (arr [ `Lexeme (`String "blibla") ]);
   test_seq Jsonm.decode "[\"bli\nbla\"]"
-    (arr [`Error (`Illegal_string_uchar 0x0A);
+    (arr [`Error (`Illegal_string_uchar (Uchar.of_int 0x0A));
           `Lexeme (`String "bli\xEF\xBF\xBDbla"); ]);
   test_seq Jsonm.decode "[\"blabla"
     [`Lexeme `As; `Error (`Unclosed `Comment); `End; `End];

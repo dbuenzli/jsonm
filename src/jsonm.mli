@@ -77,12 +77,12 @@ val pp_lexeme : Format.formatter -> [< lexeme] -> unit
 type error = [
 | `Illegal_BOM
 | `Illegal_escape of
-    [ `Not_hex_uchar of int
-    | `Not_esc_uchar of int
+    [ `Not_hex_uchar of Uchar.t
+    | `Not_esc_uchar of Uchar.t
     | `Not_lo_surrogate of int
     | `Lone_lo_surrogate of int
     | `Lone_hi_surrogate of int ]
-| `Illegal_string_uchar of int
+| `Illegal_string_uchar of Uchar.t
 | `Illegal_bytes of string
 | `Illegal_literal of string
 | `Illegal_number of string

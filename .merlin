@@ -1,4 +1,4 @@
-PKG uutf
+PKG uchar uutf
 S src
 S test
 B _build/src

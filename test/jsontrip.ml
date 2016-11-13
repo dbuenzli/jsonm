@@ -138,8 +138,11 @@ let decode inf sin use_unix usize ie uncut =
 
 (* Random encode only *)
 
-let r_ascii_letter () = 0x0061 (* a *) + Random.int 26
-let r_general_scripts () = Random.int 0x2000 (* < U+2000 *)
+let r_ascii_letter () =
+  Uchar.unsafe_of_int (0x0061 (* a *) + Random.int 26)
+
+let r_general_scripts () =
+  Uchar.unsafe_of_int (Random.int 0x2000 (* < U+2000 *))
 
 let max_rint = 9007199254740993L (* 2 ^ 53 + 1 *)
 let r_int () =    (* random integer exactly representable by an OCaml float. *)
@@ -167,8 +170,9 @@ let r_comment buf =
   let style = if Random.bool () then `M else `S in
   for i = 0 to Random.int 64 do
     let c = r_general_scripts () in
+    let ci = Uchar.to_int c in
     (* avoid any // and */ sequence and control chars *)
-    if c != 0x002F (* / *) && c > 0x001F then Uutf.Buffer.add_utf_8 buf c
+    if ci != 0x002F (* / *) && ci > 0x001F then Uutf.Buffer.add_utf_8 buf c
   done;
   `Comment (style, Buffer.contents buf)
 

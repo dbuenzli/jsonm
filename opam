@@ -12,7 +12,8 @@ depends: [
   "ocamlfind" {build}
   "ocamlbuild" {build}
   "topkg" {build}
+  "uchar"
   "uutf" ]
 build:[[
   "ocaml" "pkg/pkg.ml" "build"
-          "--installer" "true" ]]
+          "--pinned" "%{pinned}%" ]]
