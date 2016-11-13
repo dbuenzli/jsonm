@@ -8,4 +8,7 @@ let () =
   Ok [ Pkg.mllib "src/jsonm.mllib";
        Pkg.bin "test/jsontrip";
        Pkg.doc "test/examples.ml";
-       Pkg.doc "test/jtree.ml"; ]
+       Pkg.doc "test/jtree.ml";
+       Pkg.test "test/test";
+       Pkg.test ~run:false "test/examples";
+       Pkg.test ~run:false "test/jtree"; ]

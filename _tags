@@ -1,7 +1,5 @@
 true : bin_annot, package(uchar), package(uutf)
 <src> : include
 <test> : include
-<test/jsontrip.{byte,native}> : package(unix), package(uutf)
-<test/examples.{byte,native}> : package(unix), package(uutf)
-<test/test.{byte,native}> : package(uutf)
-<test/jtree.{byte,native}> : package(uutf)
+<test/jsontrip.*> : package(unix)
+<test/examples.*> : package(unix)

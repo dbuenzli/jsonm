@@ -70,6 +70,6 @@ let main () =
   match json_of_src (`Channel stdin) with
   | `JSON j -> json_to_dst ~minify (`Channel stdout) j
   | `Error (((l1, c1), (l2, c2)), e) ->
-      Format.eprintf "-:%d.%d-%d.%d: %a" l1 c1 l2 c2 Jsonm.pp_error e
+      Format.eprintf "-:%d.%d-%d.%d: %a\n%!" l1 c1 l2 c2 Jsonm.pp_error e
 
 let () = main ()
