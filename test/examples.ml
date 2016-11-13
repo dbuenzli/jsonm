@@ -30,8 +30,8 @@ let trip_fd ?encoding ?minify
         let wc = write fd s j l in
         if wc < l then unix_write fd s (j + wc) (l - wc) else ()
       in
-      unix_write fd s 0 (String.length s - Jsonm.Manual.dst_rem e);
-      Jsonm.Manual.dst e s 0 (String.length s);
+      unix_write fd s 0 (Bytes.length s - Jsonm.Manual.dst_rem e);
+      Jsonm.Manual.dst e s 0 (Bytes.length s);
       encode fd s e `Await
   in
   let rec loop fdi fdo ds es d e = match Jsonm.decode d with
@@ -42,14 +42,14 @@ let trip_fd ?encoding ?minify
       let rec unix_read fd s j l = try Unix.read fd s j l with
       | Unix.Unix_error (Unix.EINTR, _, _) -> unix_read fd s j l
       in
-      let rc = unix_read fdi ds 0 (String.length ds) in
+      let rc = unix_read fdi ds 0 (Bytes.length ds) in
       Jsonm.Manual.src d ds 0 rc; loop fdi fdo ds es d e
   in
-  let ds = String.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
-  let es = String.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
+  let ds = Bytes.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
+  let es = Bytes.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
   let d = Jsonm.decoder ?encoding `Manual in
   let e = Jsonm.encoder ?minify `Manual in
-  Jsonm.Manual.dst e es 0 (String.length es);
+  Jsonm.Manual.dst e es 0 (Bytes.length es);
   loop fdi fdo ds es d e
 
 (* Member selection *)

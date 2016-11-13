@@ -33,20 +33,22 @@ let string_of_channel use_unix ic =
   let b = Buffer.create unix_buffer_size in
   let input, s =
     if use_unix
-    then unix_read (Unix.descr_of_in_channel ic), String.create unix_buffer_size
-    else input ic, String.create io_buffer_size
+    then unix_read (Unix.descr_of_in_channel ic), Bytes.create unix_buffer_size
+    else input ic, Bytes.create io_buffer_size
   in
   let rec loop b input s =
-    let rc = input s 0 (String.length s) in
+    let rc = input s 0 (Bytes.length s) in
     if rc = 0 then Buffer.contents b else
-    (Buffer.add_substring b s 0 rc; loop b input s)
+    let us = Bytes.unsafe_to_string s in
+    (Buffer.add_substring b us 0 rc; loop b input s)
   in
   loop b input s
 
-let string_to_channel use_unix oc s =
-  if use_unix
-  then unix_write (Unix.descr_of_out_channel oc) s 0 (String.length s)
-  else output_string oc s
+let string_to_channel use_unix oc s = match use_unix with
+| false -> output_string oc s
+| true ->
+    let s = Bytes.unsafe_of_string s in
+    unix_write (Unix.descr_of_out_channel oc) s 0 (Bytes.length s)
 
 let dst_for sout = if sout then `Buffer (Buffer.create 512) else `Channel stdout
 let src_for inf sin use_unix =
@@ -68,8 +70,8 @@ let close_src_unix fd = try if fd <> Unix.stdin then Unix.close fd with
 
 let rec encode_unix encode fd s e v = match encode e v with `Ok -> ()
 | `Partial ->
-    unix_write fd s 0 (String.length s - Jsonm.Manual.dst_rem e);
-    Jsonm.Manual.dst e s 0 (String.length s);
+    unix_write fd s 0 (Bytes.length s - Jsonm.Manual.dst_rem e);
+    Jsonm.Manual.dst e s 0 (Bytes.length s);
     encode_unix encode fd s e `Await
 
 (* Dump *)
@@ -86,13 +88,13 @@ let dump_unix inf encoding uncut usize fd =
   let decode = if uncut then Jsonm.Uncut.decode else Jsonm.decode in
   let rec loop decode fd s d = match decode d with
   | `Await ->
-      let rc = unix_read fd s 0 (String.length s) in
+      let rc = unix_read fd s 0 (Bytes.length s) in
       Jsonm.Manual.src d s 0 rc; loop decode fd s d
   | v ->
       pr_decode Format.std_formatter inf d v;
       if v <> `End then loop decode fd s d
   in
-  loop decode fd (String.create usize) (Jsonm.decoder ?encoding `Manual);
+  loop decode fd (Bytes.create usize) (Jsonm.decoder ?encoding `Manual);
   close_src_unix fd
 
 let dump inf sin use_unix usize ie uncut =
@@ -127,10 +129,10 @@ let decode_unix inf encoding uncut usize fd =
   | `Comment _ | `White _  -> loop decode fd s d
   | `Error e -> log_error inf d e; loop decode fd s d
   | `Await ->
-      let rc = unix_read fd s 0 (String.length s) in
+      let rc = unix_read fd s 0 (Bytes.length s) in
       Jsonm.Manual.src d s 0 rc; loop decode fd s d
   in
-  loop decode fd (String.create usize) (Jsonm.decoder ?encoding `Manual)
+  loop decode fd (Bytes.create usize) (Jsonm.decoder ?encoding `Manual)
 
 let decode inf sin use_unix usize ie uncut =
   if sin || not use_unix then decode_ inf ie uncut (src_for inf use_unix sin)
@@ -235,8 +237,8 @@ let encode_f buf uncut minify dst =
   fun v -> r_uncut enc buf; enc v; r_uncut enc buf
 
 let encode_f_unix usize buf uncut minify fd =
-  let e, s = Jsonm.encoder ~minify `Manual, String.create usize in
-  Jsonm.Manual.dst e s 0 (String.length s);
+  let e, s = Jsonm.encoder ~minify `Manual, Bytes.create usize in
+  Jsonm.Manual.dst e s 0 (Bytes.length s);
   if not uncut then (fun v -> encode_unix Jsonm.encode fd s e v) else
   let enc v = encode_unix Jsonm.Uncut.encode fd s e v in
   fun v -> r_uncut enc buf; enc v; r_uncut enc buf
@@ -280,12 +282,12 @@ let trip_unix inf usize uncut minify encoding fdi fdo =
       loop decode fdi fdo ds es d e
   | `Error err -> log_error inf d err
   | `Await ->
-      let rc = unix_read fdi ds 0 (String.length ds) in
+      let rc = unix_read fdi ds 0 (Bytes.length ds) in
       Jsonm.Manual.src d ds 0 rc; loop decode fdi fdo ds es d e
   in
-  let d, ds = Jsonm.decoder ?encoding `Manual, String.create usize in
-  let e, es = Jsonm.encoder ~minify `Manual, String.create usize in
-  Jsonm.Manual.dst e es 0 (String.length es);
+  let d, ds = Jsonm.decoder ?encoding `Manual, Bytes.create usize in
+  let e, es = Jsonm.encoder ~minify `Manual, Bytes.create usize in
+  Jsonm.Manual.dst e es 0 (Bytes.length es);
   loop decode fdi fdo ds es d e; close_src_unix fdi
 
 let trip inf sin sout use_unix usize ie uncut minify =

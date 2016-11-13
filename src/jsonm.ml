@@ -9,13 +9,16 @@
 let io_buffer_size = 65536                          (* IO_BUFFER_SIZE 4.0.0 *)
 let pp = Format.fprintf
 
-(* Unsafe string byte manipulations. If you don't believe the authors's
+(* Unsafe string and bytes manipulations. If you don't believe the authors's
    invariants, replacing with safe versions makes everything safe in the
    module. He won't be upset. *)
 
-let unsafe_blit = String.unsafe_blit
-let unsafe_set_byte s j byte = String.unsafe_set s j (Char.unsafe_chr byte)
 let unsafe_byte s j = Char.code (String.unsafe_get s j)
+
+let unsafe_blit s soff d doff =
+  Bytes.unsafe_blit (Bytes.unsafe_of_string s) soff d doff
+
+let unsafe_set_byte s j byte = Bytes.unsafe_set s j (Char.unsafe_chr byte)
 
 (* Characters and their classes *)
 
@@ -426,7 +429,7 @@ type encode = [ `Await | `End | `Lexeme of lexeme ]
 type encoder =
   { dst : dst;                                        (* output destination. *)
     minify : bool;                             (* [true] for compact output. *)
-    mutable o : string;                             (* current output chunk. *)
+    mutable o : Bytes.t;                            (* current output chunk. *)
     mutable o_pos : int;                   (* next output position to write. *)
     mutable o_max : int;                (* maximal output position to write. *)
     buf : Buffer.t;                              (* buffer to format floats. *)
@@ -439,14 +442,17 @@ type encoder =
 
 let o_rem e = e.o_max - e.o_pos + 1    (* remaining bytes to write in [e.o]. *)
 let dst e s j l =                                     (* set [e.o] with [s]. *)
-  if (j < 0 || l < 0 || j + l > String.length s) then invalid_bounds j l;
+  if (j < 0 || l < 0 || j + l > Bytes.length s) then invalid_bounds j l;
   e.o <- s; e.o_pos <- j; e.o_max <- j + l - 1
 
 let partial k e = function `Await -> k e | v -> expect_await v
 let flush k e = match e.dst with  (* get free space in [d.o] and [k]ontinue. *)
 | `Manual -> e.k <- partial k; `Partial
-| `Buffer b -> Buffer.add_substring b e.o 0 e.o_pos; e.o_pos <- 0; k e
 | `Channel oc -> output oc e.o 0 e.o_pos; e.o_pos <- 0; k e
+| `Buffer b ->
+    let o = Bytes.unsafe_to_string e.o in
+    Buffer.add_substring b o 0 e.o_pos; e.o_pos <- 0; k e
+
 
 let rec writeb b k e =                     (* write byte [b] and [k]ontinue. *)
   if e.o_pos > e.o_max then flush (writeb b k) e else
@@ -594,9 +600,9 @@ let rec encode_json e = function  (* first [k] to start with [`Os] or [`As]. *)
 
 let encoder ?(minify = true) dst =
   let o, o_pos, o_max = match dst with
-  | `Manual -> "", 1, 0                            (* implies [o_rem e = 0]. *)
+  | `Manual -> Bytes.empty, 1, 0                   (* implies [o_rem e = 0]. *)
   | `Buffer _
-  | `Channel _ -> String.create io_buffer_size, 0, io_buffer_size - 1
+  | `Channel _ -> Bytes.create io_buffer_size, 0, io_buffer_size - 1
   in
   { dst = (dst :> dst); minify; o; o_pos; o_max; buf = Buffer.create 30;
     stack = []; nest = 0; next_name = false; last_start = false;

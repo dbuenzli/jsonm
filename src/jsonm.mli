@@ -193,13 +193,13 @@ val encoder_minify : encoder -> bool
     {b Warning.} Use only with [`Manual] decoders and encoders. *)
 module Manual : sig
 
-  val src : decoder -> string -> int -> int -> unit
+  val src : decoder -> Bytes.t -> int -> int -> unit
   (** [src d s j l] provides [d] with [l] bytes to read, starting
       at [j] in [s]. This byte range is read by calls to {!decode} until
       [`Await] is returned. To signal the end of input call the function
       with [l = 0]. *)
 
-  val dst : encoder -> string -> int -> int -> unit
+  val dst : encoder -> Bytes.t -> int -> int -> unit
   (** [dst e s j l] provides [e] with [l] bytes to write, starting
       at [j] in [s]. This byte range is written by calls to {!encode} with [e]
       until [`Partial] is returned. Use {!dst_rem} to know the remaining
@@ -389,7 +389,7 @@ let trip_fd ?encoding ?minify
         let wc = write fd s j l in
         if wc < l then unix_write fd s (j + wc) (l - wc) else ()
       in
-      unix_write fd s 0 (String.length s - Jsonm.Manual.dst_rem e);
+      unix_write fd s 0 (Bytes.length s - Jsonm.Manual.dst_rem e);
       Jsonm.Manual.dst e s 0 (String.length s);
       encode fd s e `Await
   in
@@ -401,14 +401,14 @@ let trip_fd ?encoding ?minify
       let rec unix_read fd s j l = try Unix.read fd s j l with
       | Unix.Unix_error (Unix.EINTR, _, _) -> unix_read fd s j l
       in
-      let rc = unix_read fdi ds 0 (String.length ds) in
+      let rc = unix_read fdi ds 0 (Bytes.length ds) in
       Jsonm.Manual.src d ds 0 rc; loop fdi fdo ds es d e
   in
-  let ds = String.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
-  let es = String.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
+  let ds = Bytes.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
+  let es = Bytes.create 65536 (* UNIX_BUFFER_SIZE in 4.0.0 *) in
   let d = Jsonm.decoder ?encoding `Manual in
   let e = Jsonm.encoder ?minify `Manual in
-  Jsonm.Manual.dst e es 0 (String.length es);
+  Jsonm.Manual.dst e es 0 (Bytes.length es);
   loop fdi fdo ds es d e
 ]}
     {2:memsel Member selection}

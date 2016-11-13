@@ -1,4 +1,5 @@
 
+- Safe-string suport.
 - Uchar.t support. At the API level only `Jsonm.error` changes.
 - Build depend on topkg.
 - Relicensed from BSD3 to ISC.
