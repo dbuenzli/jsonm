@@ -10,7 +10,7 @@ The alternative "uncut" codec also processes whitespace and
 (non-standard) JSON with JavaScript comments.
 
 Jsonm is made of a single module and depends on [Uutf][uutf]. It is distributed
-under the BSD3 license.
+under the ISC license.
 
 [uutf]: http://erratique.ch/software/uutf
 
