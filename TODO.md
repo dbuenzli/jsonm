@@ -1,5 +1,3 @@
-* Update examples to allow any toplevel value.
-
 val skip : decoder -> [ `A | `O | `Element | `Member ] -> unit
 (** [skip d construct] skips lexemes depending on [construct]:
     {ul

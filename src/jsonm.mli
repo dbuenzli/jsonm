@@ -493,8 +493,7 @@ let json_to_dst ~minify
   in
   let e = Jsonm.encoder ~minify dst in
   let finish e = ignore (Jsonm.encode e `End) in
-  match json with `A _ | `O _ as json -> value json finish e
-  | _ -> invalid_arg "invalid json text"
+  value json finish e
 ]}
 *)
 
