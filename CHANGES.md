@@ -1,3 +1,7 @@
+
+
+- OCaml 4.05.0 compatibility (removal of `Uchar.dump`).
+
 v1.0.0 2016-11-23 Zagreb
 ------------------------
 

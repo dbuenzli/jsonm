@@ -115,10 +115,10 @@ let err_exp_eoi = `Error (`Expected `Eoi)
 
 let pp_cp ppf u = pp ppf "U+%04X" u
 let pp_uchar ppf u =
-  if Uchar.to_int u <= 0x1F (* most control chars *) then Uchar.dump ppf u else
+  if Uchar.to_int u <= 0x1F (* most control chars *) then pp_cp ppf (Uchar.to_int u) else
   let b = Buffer.create 4 in
   Uutf.Buffer.add_utf_8 b u;
-  pp ppf "'%s' (%a)" (Buffer.contents b) Uchar.dump u
+  pp ppf "'%s' (%a)" (Buffer.contents b) pp_cp (Uchar.to_int u)
 
 let pp_error ppf = function
 | `Illegal_BOM -> pp ppf "@[illegal@ initial@ BOM@ in@ character@ stream@]"
