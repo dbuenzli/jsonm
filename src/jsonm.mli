@@ -390,7 +390,7 @@ let trip_fd ?encoding ?minify
         if wc < l then unix_write fd s (j + wc) (l - wc) else ()
       in
       unix_write fd s 0 (Bytes.length s - Jsonm.Manual.dst_rem e);
-      Jsonm.Manual.dst e s 0 (String.length s);
+      Jsonm.Manual.dst e s 0 (Bytes.length s);
       encode fd s e `Await
   in
   let rec loop fdi fdo ds es d e = match Jsonm.decode d with
