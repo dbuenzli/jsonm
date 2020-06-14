@@ -165,16 +165,19 @@ val encode : encoder -> [< `Await | `End | `Lexeme of lexeme ] ->
   [`Ok | `Partial]
 (** [encode e v] is:
     {ul
-    {- [`Partial] iff [e] has a [`Manual] destination and needs more
-       output storage. The client must use {!Manual.dst} to provide
-       a new buffer and then call {!encode} with [`Await] until [`Ok]
-       is returned.}
+    {- [`Partial] iff [e] has a [`Manual] destination and either
+       needs more output storage or has leftover in the buffer
+       when encountering [`End]. In the former case, the client must
+       use {!Manual.dst} to provide a new buffer and then call
+       {!encode} with [`Await] until [`Ok] is returned.}
     {- [`Ok] when the encoder is ready to encode a new [`Lexeme]
        or [`End].}}
-    For [`Manual] destinations, encoding [`End] always returns [`Partial],
-    the client should as usual use {!Manual.dst} and continue with [`Await]
-    until [`Ok] is returned at which point {!Manual.dst_rem} [e] is guaranteed
-    to be the size of the last provided buffer (i.e. nothing was written).
+    For [`Manual] destinations, encoding [`End] returns [`Partial]
+    when there is leftover in the output buffer and [`Ok] otherwise.
+    In the former case, the client should as usual use {!Manual.dst}
+    and continue with [`Await] until [`Ok] is returned at which point
+    {!Manual.dst_rem} [e] is guaranteed to be the size of the last
+    provided buffer (i.e. nothing was written).
 
     {b Raises.} [Invalid_argument] if a non {{!datamodel}well-formed}
     sequence of lexemes is encoded or if [`Lexeme] or [`End] is

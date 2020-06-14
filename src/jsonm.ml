@@ -453,6 +453,13 @@ let flush k e = match e.dst with  (* get free space in [d.o] and [k]ontinue. *)
     let o = Bytes.unsafe_to_string e.o in
     Buffer.add_substring b o 0 e.o_pos; e.o_pos <- 0; k e
 
+let flush_end k e = match e.dst with  (* get free space in [d.o] and [k]ontinue. *)
+| `Manual -> if e.o_pos = 0 then k e else (e.k <- partial k; `Partial)
+| `Channel oc -> output oc e.o 0 e.o_pos; e.o_pos <- 0; k e
+| `Buffer b ->
+    let o = Bytes.unsafe_to_string e.o in
+    Buffer.add_substring b o 0 e.o_pos; e.o_pos <- 0; k e
+
 
 let rec writeb b k e =                     (* write byte [b] and [k]ontinue. *)
   if e.o_pos > e.o_max then flush (writeb b k) e else
@@ -581,7 +588,7 @@ let rec encode_ k e = function
 | `Lexeme l ->
     if e.stack = [] then expect_end l else w_lexeme k e l
 | `End as v ->
-    if e.stack = [] then flush k e else expect_lend (List.hd e.stack) v
+    if e.stack = [] then flush_end k e else expect_lend (List.hd e.stack) v
 | `White w ->
     writes w 0 (String.length w) k e
 | `Comment (`S, c) ->
