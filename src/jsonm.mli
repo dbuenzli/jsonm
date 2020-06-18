@@ -1,7 +1,6 @@
 (*---------------------------------------------------------------------------
    Copyright (c) 2012 Daniel C. Bünzli. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
-   %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
 (** Non-blocking streaming JSON codec.
@@ -18,7 +17,6 @@
     Consult the {{!datamodel}data model}, {{!limitations}limitations}
     and {{!examples}examples} of use.
 
-    {e %%VERSION%% - {{:%%PKG_HOMEPAGE%% }homepage}}
     {3 References}
     {ul
     {- T. Bray Ed.

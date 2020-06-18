@@ -1,7 +1,6 @@
 (*---------------------------------------------------------------------------
    Copyright (c) 2012 Daniel C. Bünzli. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
-   %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
 (* Braced non-terminals in comments refer to RFC 4627 non-terminals. *)
