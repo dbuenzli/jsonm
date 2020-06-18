@@ -293,7 +293,7 @@ end
        in the in the interval \[-2{^53};2{^53}\]. This is equivalent
        to the contraints JavaScript has.}
     {- A superset of JSON numbers is parsed. After having seen a minus
-       or a digit, including zero, {!Pervasives.float_of_string}, is
+       or a digit, including zero, {!Stdlib.float_of_string}, is
        used. In particular this parses number with leading zeros, which are
        specifically prohibited by the standard.}
     {- Strings returned by [`String], [`Name], [`White] and [`Comment]
@@ -321,8 +321,8 @@ end
     {ul
     {- All the strings given to the encoder must be valid UTF-8 and immutable.
        Characters that need to be escaped are automatically escaped by [Jsonm].}
-    {- [`Float] lexemes must not be, {!Pervasives.nan},
-       {!Pervasives.infinity} or {!Pervasives.neg_infinity}. They
+    {- [`Float] lexemes must not be, {!Stdlib.nan},
+       {!Stdlib.infinity} or {!Stdlib.neg_infinity}. They
        are encoded with the format string ["%.16g"], this allows
        to roundtrip all the integers that can be precisely represented
        in OCaml [float] values, i.e. the integers in the interval
