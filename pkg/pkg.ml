@@ -9,6 +9,7 @@ let () =
        Pkg.bin "test/jsontrip";
        Pkg.doc "test/examples.ml";
        Pkg.doc "test/jtree.ml";
+       Pkg.doc "doc/index.mld" ~dst:"odoc-pages/index.mld";
        Pkg.test "test/test";
        Pkg.test ~run:false "test/examples";
        Pkg.test ~run:false "test/jtree"; ]
