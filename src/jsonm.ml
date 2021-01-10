@@ -627,6 +627,81 @@ module Uncut = struct
   let encode e v = e.k e (v :> [ encode | uncut])
 end
 
+module Value = struct
+  type t = [
+  | `Null
+  | `Bool of bool
+  | `Float of float
+  | `String of string
+  | `A of t list
+  | `O of (string * t) list
+  ]
+
+  type decode_result = [
+  | `Value of t
+     (** Decoding a full value succeeded. *)
+  | `Decoding_error of error
+    (** Decoding failed with an error. *)
+  | `Unexpected of [ `Lexeme of lexeme | `End ]
+    (** Unexpected (gramatically invalid) lexeme or end-of-input *)
+  | `Await of unit -> decode_result
+    (** The decoder uses a [`Manual]  source and awaits for more input.
+        The client must use {!Manual.src} to provide it and call the returned
+        thunk to keep decoding the value. *)
+  ]
+
+  let decode d : decode_result =
+    let rec dec d f st k = match decode d with
+    | `Lexeme l -> f d st l k
+    | `Error err -> `Decoding_error err
+    | `End -> `Unexpected `End
+    | `Await -> `Await (fun () -> dec d f st k)
+    in
+    let rec value d () l k = match l with
+    | `Os -> dec d obj [] k
+    | `As -> dec d arr [] k
+    | `Null | `Bool _ | `String _ | `Float _ as v -> k v
+    | _ -> `Unexpected (`Lexeme l)
+    and arr d vs l k = match l with
+    | `Ae -> k (`A (List.rev vs))
+    | _ -> value d () l (fun v -> dec d arr (v :: vs) k)
+    and obj d ms l k = match l with
+    | `Oe -> k (`O (List.rev ms))
+    | `Name n -> dec d value () (fun v -> dec d obj ((n, v) :: ms) k)
+    | l -> `Unexpected (`Lexeme l)
+    in
+    dec d value () (fun v -> `Value v)
+
+  type encode_result = [
+  | `Ok
+    (** Encoding the value suceeded. *)
+  | `Partial of unit -> encode_result
+    (** The decoder has a [`Manual] destination and needs more output storage.
+        The client must use {!Manual.dst} to provide a new buffer, and then call
+        the provided thunk to keep encoding the value. *)
+  ]
+
+  let encode e v : encode_result =
+    let rec feed e msg f v k = match encode e msg with
+    | `Ok -> f e v k
+    | `Partial -> `Partial (fun () -> feed e `Await f v k)
+    in
+    let enc e l f v k = feed e (`Lexeme l) f v k in
+    let rec value e v k = match v with
+    | `A vs -> enc e `As arr vs k
+    | `O ms -> enc e `Os obj ms k
+    | `Null | `Bool _ | `Float _ | `String _ as l -> enc e l continue () k
+    and arr e vs k = match vs with
+    | v :: vs' -> value e v (fun e -> arr e vs' k)
+    | [] -> enc e `Ae continue () k
+    and obj e ms k = match ms with
+    | (n, v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
+    | [] -> enc e `Oe continue () k
+    and continue e () k = k e
+    in
+    value e v (fun e -> feed e `End continue () (fun x -> `Ok))
+end
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2012 The jsonm programmers
 

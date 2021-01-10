@@ -17,6 +17,9 @@
     Consult the {{!datamodel}data model}, {{!limitations}limitations}
     and {{!examples}examples} of use.
 
+    As a convenience, the {{!Value}Value module} provides blocking functions
+    to encode and decode full JSON values.
+
     {3 References}
     {ul
     {- T. Bray Ed.
@@ -430,70 +433,48 @@ let memsel ?encoding names
   in
   loop [] names (Jsonm.decoder ?encoding src)
 ]}
-
-    {2:tree Generic JSON representation}
-
-    A generic OCaml representation of JSON text is the following one.
-{[
-type json =
-  [ `Null | `Bool of bool | `Float of float| `String of string
-  | `A of json list | `O of (string * json) list ]
-]}
-    The result of [json_of_src src] is the JSON text from [src] in this
-    representation. The function is tail recursive.
-{[
-exception Escape of ((int * int) * (int * int)) * Jsonm.error
-
-let json_of_src ?encoding
-    (src : [`Channel of in_channel | `String of string])
-  =
-  let dec d = match Jsonm.decode d with
-  | `Lexeme l -> l
-  | `Error e -> raise (Escape (Jsonm.decoded_range d, e))
-  | `End | `Await -> assert false
-  in
-  let rec value v k d = match v with
-  | `Os -> obj [] k d  | `As -> arr [] k d
-  | `Null | `Bool _ | `String _ | `Float _ as v -> k v d
-  | _ -> assert false
-  and arr vs k d = match dec d with
-  | `Ae -> k (`A (List.rev vs)) d
-  | v -> value v (fun v -> arr (v :: vs) k) d
-  and obj ms k d = match dec d with
-  | `Oe -> k (`O (List.rev ms)) d
-  | `Name n -> value (dec d) (fun v -> obj ((n, v) :: ms) k) d
-  | _ -> assert false
-  in
-  let d = Jsonm.decoder ?encoding src in
-  try `JSON (value (dec d) (fun v _ -> v) d) with
-  | Escape (r, e) -> `Error (r, e)
-]}
-    The result of [json_to_dst dst json] has the JSON text [json] written
-    on [dst]. The function is tail recursive.
-{[
-let json_to_dst ~minify
-    (dst : [`Channel of out_channel | `Buffer of Buffer.t ])
-    (json : json)
-  =
-  let enc e l = ignore (Jsonm.encode e (`Lexeme l)) in
-  let rec value v k e = match v with
-  | `A vs -> arr vs k e
-  | `O ms -> obj ms k e
-  | `Null | `Bool _ | `Float _ | `String _ as v -> enc e v; k e
-  and arr vs k e = enc e `As; arr_vs vs k e
-  and arr_vs vs k e = match vs with
-  | v :: vs' -> value v (arr_vs vs' k) e
-  | [] -> enc e `Ae; k e
-  and obj ms k e = enc e `Os; obj_ms ms k e
-  and obj_ms ms k e = match ms with
-  | (n, v) :: ms -> enc e (`Name n); value v (obj_ms ms k) e
-  | [] -> enc e `Oe; k e
-  in
-  let e = Jsonm.encoder ~minify dst in
-  let finish e = ignore (Jsonm.encode e `End) in
-  value json finish e
-]}
 *)
+
+(** {1:value Json values}
+
+  A generic OCaml representation of JSON trees,
+  along with convenience functions to encode
+  and decode them.
+*)
+module Value : sig
+  type t = [
+  | `Null
+  | `Bool of bool
+  | `Float of float
+  | `String of string
+  | `A of t list
+  | `O of (string * t) list
+  ]
+
+  type decode_result = [
+  | `Value of t
+     (** Decoding a full value succeeded. *)
+  | `Decoding_error of error
+    (** Decoding failed with an error. *)
+  | `Unexpected of [ `Lexeme of lexeme | `End ]
+    (** Unexpected (gramatically invalid) lexeme or end-of-input *)
+  | `Await of unit -> decode_result
+    (** The decoder uses a [`Manual]  source and awaits for more input.
+        The client must use {!Manual.src} to provide it and call the returned
+        thunk to keep decoding the value. *)
+  ]
+  val decode : decoder -> decode_result
+
+  type encode_result = [
+  | `Ok
+    (** Encoding the value suceeded. *)
+  | `Partial of unit -> encode_result
+    (** The decoder has a [`Manual] destination and needs more output storage.
+        The client must use {!Manual.dst} to provide a new buffer, and then call
+        the provided thunk to keep encoding the value. *)
+  ]
+  val encode : encoder -> t -> encode_result
+end
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2012 The jsonm programmers

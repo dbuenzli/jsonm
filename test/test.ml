@@ -295,7 +295,7 @@ let decoder_eoi () =
 
 let trip () =
   log "Codec round-trips.\n";
-  let trip s =
+  let trip_streaming s =
     let b = Buffer.create (String.length s) in
     let d = Jsonm.decoder (`String s) in
     let e = Jsonm.encoder (`Buffer b) in
@@ -308,7 +308,29 @@ let trip () =
     loop d e;
     let trips = Buffer.contents b in
     if trips <> s then
-    fail "fnd: %s@\nexp: %s@\n" trips s
+    fail "streaming@\nfnd: %s@\nexp: %s@\n" trips s
+  in
+  let trip_value s =
+    let b = Buffer.create (String.length s) in
+    let d = Jsonm.decoder (`String s) in
+    let e = Jsonm.encoder (`Buffer b) in
+    let v =
+      match Jsonm.Value.decode d with
+      | `Value v ->v
+      | `Decoding_error _ | `Unexpected _ | `Await _ -> assert false
+    in
+    let () =
+      match Jsonm.Value.encode e v with
+      | `Ok -> ()
+      | `Partial _ -> assert false
+    in
+    let trips = Buffer.contents b in
+    if trips <> s then
+    fail "value@\nfnd: %s@\nexp: %s@\n" trips s
+  in
+  let trip s =
+    trip_streaming s;
+    trip_value s;
   in
   trip "null";
   trip "true";
