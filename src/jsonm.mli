@@ -132,8 +132,10 @@ val decode : decoder -> [> `Await | `Lexeme of lexeme | `End | `Error of error ]
 val decoded_range : decoder -> (int * int) * (int * int)
 (** [decoded_range d] is the range of characters spanning the last
     [`Lexeme] or [`Error] (or [`White] or [`Comment] for an
-    {!Uncut.decode}) decoded by [d].  A pair of line and column numbers
-    respectively one and zero based. *)
+    {!Uncut.decode}) decoded by [d]. The start and end of this
+    range are each represented by a pair of line and column numbers
+    respectively one and zero based:
+    [((start_line, start_col), (end_line, end_col))]. *)
 
 val decoder_encoding : decoder -> encoding
 (** [decoder_encoding d] is [d]'s encoding.
