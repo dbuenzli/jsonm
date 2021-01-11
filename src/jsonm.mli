@@ -132,11 +132,18 @@ val decode : decoder -> [> `Await | `Lexeme of lexeme | `End | `Error of error ]
     {b Note.} Repeated invocation always eventually returns [`End], even
     in case of errors. *)
 
-val decoded_range : decoder -> (int * int) * (int * int)
+type pos = int * int
+(** A position in the input is represented by a line number and a column
+    number, respectively one and zero based. *)
+
+type range = pos * pos
+(** A range of characters is represented by the position where it starts
+    and the position where it ends. *)
+
+val decoded_range : decoder -> range
 (** [decoded_range d] is the range of characters spanning the last
     [`Lexeme] or [`Error] (or [`White] or [`Comment] for an
-    {!Uncut.decode}) decoded by [d].  A pair of line and column numbers
-    respectively one and zero based. *)
+    {!Uncut.decode}) decoded by [d]. *)
 
 val decoder_encoding : decoder -> encoding
 (** [decoder_encoding d] is [d]'s encoding.
@@ -442,28 +449,34 @@ let memsel ?encoding names
   and decode them.
 *)
 module Value : sig
-  type t = [
+  type 'loc t = 'loc value * 'loc
+  and 'loc value = [
   | `Null
   | `Bool of bool
   | `Float of float
   | `String of string
-  | `A of t list
-  | `O of (string * t) list
+  | `A of 'loc t list
+  | `O of ((string * 'loc) * 'loc t) list
   ]
+  (** The type of JSON trees is parametrized over the type 'loc
+      representing source locations. In particular you can use
+      [unit value] to represent JSON values without position information,
+      and our decoders return [range value], pairing nodes in the tree
+      with the corresponding character range in the input source. *)
 
-  type decode_result = [
-  | `Value of t
+  type 'loc decode_result = [
+  | `Value of 'loc t
      (** Decoding a full value succeeded. *)
   | `Decoding_error of error
     (** Decoding failed with an error. *)
   | `Unexpected of [ `Lexeme of lexeme | `End ]
     (** Unexpected (gramatically invalid) lexeme or end-of-input *)
-  | `Await of unit -> decode_result
+  | `Await of unit -> 'loc decode_result
     (** The decoder uses a [`Manual]  source and awaits for more input.
         The client must use {!Manual.src} to provide it and call the returned
         thunk to keep decoding the value. *)
   ]
-  val decode : decoder -> decode_result
+  val decode : decoder -> range decode_result
 
   type encode_result = [
   | `Ok
@@ -473,7 +486,7 @@ module Value : sig
         The client must use {!Manual.dst} to provide a new buffer, and then call
         the provided thunk to keep encoding the value. *)
   ]
-  val encode : encoder -> t -> encode_result
+  val encode : encoder -> 'loc t -> encode_result
 end
 
 (*---------------------------------------------------------------------------

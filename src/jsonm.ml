@@ -164,6 +164,7 @@ let pp_error ppf = function
     end
 
 type pos = int * int
+type range = pos * pos
 type encoding = [ `UTF_8 | `UTF_16 | `UTF_16BE | `UTF_16LE ]
 type src = [ `Channel of in_channel | `String of string | `Manual ]
 type decode = [ `Await | `End | `Lexeme of lexeme | `Error of error ]
@@ -397,6 +398,8 @@ let rec decode d = match (d.uncut <- false; d.k d) with
 | `Comment _ | `White _ -> assert false
 
 let decoder_src d = Uutf.decoder_src d.u
+let decoded_start_pos d = (d.s_line, d.s_col)
+let decoded_end_pos d = (d.e_line, d.e_col)
 let decoded_range d = (d.s_line, d.s_col), (d.e_line, d.e_col)
 let decoder_encoding d = match Uutf.decoder_encoding d.u with
 | #encoding as enc -> enc
@@ -628,49 +631,57 @@ module Uncut = struct
 end
 
 module Value = struct
-  type t = [
+  type 'loc t = 'loc value * 'loc
+  and 'loc value = [
   | `Null
   | `Bool of bool
   | `Float of float
   | `String of string
-  | `A of t list
-  | `O of (string * t) list
+  | `A of 'loc t list
+  | `O of ((string * 'loc) * 'loc t) list
   ]
 
-  type decode_result = [
-  | `Value of t
+  type 'loc decode_result = [
+  | `Value of 'loc t
      (** Decoding a full value succeeded. *)
   | `Decoding_error of error
     (** Decoding failed with an error. *)
   | `Unexpected of [ `Lexeme of lexeme | `End ]
     (** Unexpected (gramatically invalid) lexeme or end-of-input *)
-  | `Await of unit -> decode_result
+  | `Await of unit -> 'loc decode_result
     (** The decoder uses a [`Manual]  source and awaits for more input.
         The client must use {!Manual.src} to provide it and call the returned
         thunk to keep decoding the value. *)
   ]
 
-  let decode d : decode_result =
-    let rec dec d f st k = match decode d with
-    | `Lexeme l -> f d st l k
+  let decode d : range decode_result =
+    let rec dec d f pos st k = match decode d with
+    | `Lexeme l -> f d pos st l k
     | `Error err -> `Decoding_error err
     | `End -> `Unexpected `End
-    | `Await -> `Await (fun () -> dec d f st k)
+    | `Await -> `Await (fun () -> dec d f pos st k)
     in
-    let rec value d () l k = match l with
-    | `Os -> dec d obj [] k
-    | `As -> dec d arr [] k
-    | `Null | `Bool _ | `String _ | `Float _ as v -> k v
+    let rec value d () () l k = match l with
+    | `Os -> dec d obj (decoded_start_pos d) [] k
+    | `As -> dec d arr (decoded_start_pos d) [] k
+    | `Null | `Bool _ | `String _ | `Float _ as v -> k (v, decoded_range d)
     | _ -> `Unexpected (`Lexeme l)
-    and arr d vs l k = match l with
-    | `Ae -> k (`A (List.rev vs))
-    | _ -> value d () l (fun v -> dec d arr (v :: vs) k)
-    and obj d ms l k = match l with
-    | `Oe -> k (`O (List.rev ms))
-    | `Name n -> dec d value () (fun v -> dec d obj ((n, v) :: ms) k)
+    and arr d start_pos vs l k = match l with
+    | `Ae ->
+        let end_pos = decoded_start_pos d in
+        k (`A (List.rev vs), (start_pos, end_pos))
+    | _ ->
+        value d () () l (fun v -> dec d arr start_pos (v :: vs) k)
+    and obj d start_pos ms l k = match l with
+    | `Oe ->
+        let end_pos = decoded_start_pos d in
+        k (`O (List.rev ms), (start_pos, end_pos))
+    | `Name n ->
+        let n_loc = decoded_range d in
+        dec d value () () (fun v -> dec d obj start_pos (((n, n_loc), v) :: ms) k)
     | l -> `Unexpected (`Lexeme l)
     in
-    dec d value () (fun v -> `Value v)
+    dec d value () () (fun v -> `Value v)
 
   type encode_result = [
   | `Ok
@@ -687,15 +698,15 @@ module Value = struct
     | `Partial -> `Partial (fun () -> feed e `Await f v k)
     in
     let enc e l f v k = feed e (`Lexeme l) f v k in
-    let rec value e v k = match v with
+    let rec value e (v, _loc) k = match v with
     | `A vs -> enc e `As arr vs k
     | `O ms -> enc e `Os obj ms k
-    | `Null | `Bool _ | `Float _ | `String _ as l -> enc e l continue () k
+    | (`Null | `Bool _ | `Float _ | `String _) as l -> enc e l continue () k
     and arr e vs k = match vs with
     | v :: vs' -> value e v (fun e -> arr e vs' k)
     | [] -> enc e `Ae continue () k
     and obj e ms k = match ms with
-    | (n, v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
+    | ((n, _loc), v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
     | [] -> enc e `Oe continue () k
     and continue e () k = k e
     in
