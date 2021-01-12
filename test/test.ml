@@ -319,10 +319,9 @@ let trip () =
     let e = Jsonm.encoder (`Buffer b) in
     let v =
       match Jsonm.Value.decode d with
-      | `Value v -> v
+      | `Value v ->v
       | `Decoding_error _ | `Unexpected _ | `Await _ -> assert false
     in
-    let v = Jsonm.Value.erase_locs v in
     let () =
       match Jsonm.Value.encode e v with
       | `Ok -> ()

@@ -631,53 +631,30 @@ module Uncut = struct
 end
 
 module Value = struct
-  module With_loc = struct
-    type t = value * range
-    and value = [
-    | `Null
-    | `Bool of bool
-    | `Float of float
-    | `String of string
-    | `A of t list
-    | `O of ((string * range) * t) list
-    ]
-  end
+  type 'loc t = 'loc value * 'loc
+  and 'loc value = [
+  | `Null
+  | `Bool of bool
+  | `Float of float
+  | `String of string
+  | `A of 'loc t list
+  | `O of ((string * 'loc) * 'loc t) list
+  ]
 
-  module Without_loc = struct
-    type t = value
-    and value = [
-    | `Null
-    | `Bool of bool
-    | `Float of float
-    | `String of string
-    | `A of t list
-    | `O of (string * t) list
-    ]
-  end
-
-  let rec erase_locs ((v, _loc) : With_loc.t) : Without_loc.t =
-    match v with
-    | (`Null | `Bool _ | `Float _ | `String _) as v ->
-        v
-    | `A vs ->
-        `A (List.rev (List.rev_map erase_locs vs))
-    | `O ms ->
-        `O (List.rev (List.map (fun ((n, _loc), v) -> (n, erase_locs v)) ms))
-
-  type decode_result = [
-  | `Value of With_loc.t
+  type 'loc decode_result = [
+  | `Value of 'loc t
      (** Decoding a full value succeeded. *)
   | `Decoding_error of error
     (** Decoding failed with an error. *)
   | `Unexpected of [ `Lexeme of lexeme | `End ]
     (** Unexpected (gramatically invalid) lexeme or end-of-input *)
-  | `Await of unit -> decode_result
+  | `Await of unit -> 'loc decode_result
     (** The decoder uses a [`Manual]  source and awaits for more input.
         The client must use {!Manual.src} to provide it and call the returned
         thunk to keep decoding the value. *)
   ]
 
-  let decode d : decode_result =
+  let decode d : range decode_result =
     let rec dec d f pos st k = match decode d with
     | `Lexeme l -> f d pos st l k
     | `Error err -> `Decoding_error err
@@ -721,7 +698,7 @@ module Value = struct
     | `Partial -> `Partial (fun () -> feed e `Await f v k)
     in
     let enc e l f v k = feed e (`Lexeme l) f v k in
-    let rec value e v k = match v with
+    let rec value e (v, _loc) k = match v with
     | `A vs -> enc e `As arr vs k
     | `O ms -> enc e `Os obj ms k
     | (`Null | `Bool _ | `Float _ | `String _) as l -> enc e l continue () k
@@ -729,7 +706,7 @@ module Value = struct
     | v :: vs' -> value e v (fun e -> arr e vs' k)
     | [] -> enc e `Ae continue () k
     and obj e ms k = match ms with
-    | (n, v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
+    | ((n, _loc), v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
     | [] -> enc e `Oe continue () k
     and continue e () k = k e
     in
