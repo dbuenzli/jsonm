@@ -451,11 +451,11 @@ let memsel ?encoding names
 module Value : sig
   type 'loc t = [
   | `Null of 'loc
-  | `Bool of 'loc * bool
-  | `Float of 'loc * float
-  | `String of 'loc * string
-  | `A of 'loc * 'loc t list
-  | `O of 'loc * (('loc * string) * 'loc t) list
+  | `Bool of bool * 'loc
+  | `Float of float * 'loc
+  | `String of string * 'loc
+  | `A of 'loc t list * 'loc
+  | `O of ((string * 'loc) * 'loc t) list * 'loc
   ]
   (** The type of JSON trees is parametrized over the type 'loc
       representing source locations. In particular you can use

@@ -633,11 +633,11 @@ end
 module Value = struct
   type 'loc t = [
   | `Null of 'loc
-  | `Bool of 'loc * bool
-  | `Float of 'loc * float
-  | `String of 'loc * string
-  | `A of 'loc * 'loc t list
-  | `O of 'loc * (('loc * string) * 'loc t) list
+  | `Bool of bool * 'loc
+  | `Float of float * 'loc
+  | `String of string * 'loc
+  | `A of 'loc t list * 'loc
+  | `O of ((string * 'loc) * 'loc t) list * 'loc
   ]
 
   type 'loc decode_result = [
@@ -664,23 +664,23 @@ module Value = struct
     | `Os -> dec d obj (decoded_start_pos d) [] k
     | `As -> dec d arr (decoded_start_pos d) [] k
     | `Null -> k (`Null (decoded_range d))
-    | `Bool b -> k (`Bool (decoded_range d, b))
-    | `Float x -> k (`Float (decoded_range d, x))
-    | `String s -> k (`String (decoded_range d, s))
+    | `Bool b -> k (`Bool (b, decoded_range d))
+    | `Float x -> k (`Float (x, decoded_range d))
+    | `String s -> k (`String (s, decoded_range d))
     | _ -> `Unexpected (`Lexeme l)
     and arr d start_pos vs l k = match l with
     | `Ae ->
         let end_pos = decoded_start_pos d in
-        k (`A ((start_pos, end_pos), List.rev vs))
+        k (`A (List.rev vs, (start_pos, end_pos)))
     | _ ->
         value d () () l (fun v -> dec d arr start_pos (v :: vs) k)
     and obj d start_pos ms l k = match l with
     | `Oe ->
         let end_pos = decoded_start_pos d in
-        k (`O ((start_pos, end_pos), List.rev ms))
+        k (`O (List.rev ms, (start_pos, end_pos)))
     | `Name n ->
         let n_loc = decoded_range d in
-        dec d value () () (fun v -> dec d obj start_pos (((n_loc, n), v) :: ms) k)
+        dec d value () () (fun v -> dec d obj start_pos (((n, n_loc), v) :: ms) k)
     | l -> `Unexpected (`Lexeme l)
     in
     dec d value () () (fun v -> `Value v)
@@ -701,17 +701,17 @@ module Value = struct
     in
     let enc e l f v k = feed e (`Lexeme l) f v k in
     let rec value e v k = match v with
-    | `A (_, vs) -> enc e `As arr vs k
-    | `O (_, ms) -> enc e `Os obj ms k
+    | `A (vs, _) -> enc e `As arr vs k
+    | `O (ms, _) -> enc e `Os obj ms k
     | `Null _ -> enc e `Null continue () k
-    | `Bool (_, b) -> enc e (`Bool b) continue () k
-    | `Float (_, x) -> enc e (`Float x) continue () k
-    | `String (_, s) -> enc e (`String s) continue () k
+    | `Bool (b, _) -> enc e (`Bool b) continue () k
+    | `Float (x, _) -> enc e (`Float x) continue () k
+    | `String (s, _) -> enc e (`String s) continue () k
     and arr e vs k = match vs with
     | v :: vs' -> value e v (fun e -> arr e vs' k)
     | [] -> enc e `Ae continue () k
     and obj e ms k = match ms with
-    | ((_, n), v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
+    | ((n, _), v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
     | [] -> enc e `Oe continue () k
     and continue e () k = k e
     in
