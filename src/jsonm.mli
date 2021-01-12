@@ -449,19 +449,18 @@ let memsel ?encoding names
   and decode them.
 *)
 module Value : sig
-  type 'loc t = 'loc value * 'loc
-  and 'loc value = [
-  | `Null
-  | `Bool of bool
-  | `Float of float
-  | `String of string
-  | `A of 'loc t list
-  | `O of ((string * 'loc) * 'loc t) list
+  type 'loc t = [
+  | `Null of 'loc
+  | `Bool of 'loc * bool
+  | `Float of 'loc * float
+  | `String of 'loc * string
+  | `A of 'loc * 'loc t list
+  | `O of 'loc * (('loc * string) * 'loc t) list
   ]
   (** The type of JSON trees is parametrized over the type 'loc
       representing source locations. In particular you can use
-      [unit value] to represent JSON values without position information,
-      and our decoders return [range value], pairing nodes in the tree
+      [unit t] to represent JSON values without position information,
+      and our decoders return [range t], pairing nodes in the tree
       with the corresponding character range in the input source. *)
 
   type 'loc decode_result = [
