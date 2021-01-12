@@ -6,7 +6,10 @@
 let str = Format.sprintf
 let log f = Format.printf (f ^^ "@?")
 let fail fmt =
-  let fail _ = failwith (Format.flush_str_formatter ()) in
+  let fail _ =
+    let msg = Format.flush_str_formatter () in
+    Printf.eprintf "Failure: %s%!" msg;
+    failwith msg in
   Format.kfprintf fail Format.str_formatter fmt
 
 let encoder_invalid () =
