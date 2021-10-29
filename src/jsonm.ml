@@ -163,6 +163,20 @@ let pp_error ppf = function
     | `Eoi -> pp ppf "end@ of@ input@]"
     end
 
+module Depth : sig
+  type t
+  val zero : t
+  val succ : t -> t
+  val allow_direct_call : t -> bool
+end = struct
+  type t = int
+  let zero = 0
+  let succ = succ
+  let allow_direct_call = match Sys.backend_type with
+    | Native | Bytecode -> (fun _ -> true)
+    | Other _ -> (fun x -> x < 100)
+end
+
 type pos = int * int
 type encoding = [ `UTF_8 | `UTF_16 | `UTF_16BE | `UTF_16LE ]
 type src = [ `Channel of in_channel | `String of string | `Manual ]
@@ -193,7 +207,7 @@ type decoder =
     mutable next_name : bool;    (* [true] if next decode should be [`Name]. *)
     mutable last_start : bool;      (* [true] if last lexeme was `As or `Os. *)
     mutable k :                                     (* decoder continuation. *)
-      int -> decoder -> [ decode | uncut | `Continue ] }
+      Depth.t -> decoder -> [ decode | uncut | `Continue ] }
 
 let baddc d c = Uutf.Buffer.add_utf_8 d.buf (Uchar.unsafe_of_int c)
 let badd d = Uutf.Buffer.add_utf_8 d.buf (Uchar.unsafe_of_int d.c)
@@ -209,17 +223,15 @@ let dpop d = match (spos d; epos d; d.stack) with
 | _ :: (`As _ :: _ as ss) -> d.next_name <- false; d.stack <- ss
 | _ :: [] -> d.next_name <- false; d.stack <- []
 | [] -> assert false
-
+let r_cont k (depth : Depth.t) d =
+  if Depth.allow_direct_call depth
+  then k (Depth.succ depth) d
+  else (d.k <- k; `Continue)
 let ret_eoi _depth d = `End
 let ret (v : [< decode | uncut | `Continue]) k _depth d = d.k <- k; v
-let rec readc k (depth : int) (d : decoder) = match Uutf.decode d.u with
-| `Uchar u -> d.c <- (Uchar.to_int u);
-    if depth < 10
-    then
-      k (succ depth) d
-    else
-      ret `Continue k depth d
-| `End -> d.c <- ux_eoi; k (succ depth) d
+let rec readc k depth d = match Uutf.decode d.u with
+| `Uchar u -> d.c <- (Uchar.to_int u); r_cont k depth d
+| `End -> d.c <- ux_eoi; r_cont k depth d
 | `Await -> ret `Await (readc k) depth d
 | `Malformed bs -> d.c <- u_rep; epos d; ret (err_bytes bs) k depth d
 
@@ -250,12 +262,12 @@ let rec r_ws_uncut k depth d =
 let rec r_white_uncut k depth d =                                (* {ws} / comment *)
   if (is_white d.c) then (spos d; r_ws_uncut (r_white_uncut k) depth d) else
   if (d.c = u_slash) then (spos d; readc (r_comment (r_white_uncut k)) depth d) else
-  k (succ depth) d
+  r_cont k depth d
 
-let rec r_ws k depth d = if (is_white d.c) then readc (r_ws k) depth d else k (succ depth) d  (* {ws} *)
+let rec r_ws k depth d = if (is_white d.c) then readc (r_ws k) depth d else r_cont k depth d  (* {ws} *)
 let r_white k depth d = if d.uncut then r_white_uncut k depth d else r_ws k depth d
 
-let rec r_u_escape hi u count k (depth : int) (d : decoder) =                      (* unicode escapes. *)
+let rec r_u_escape hi u count k depth d =                      (* unicode escapes. *)
   let error err k depth d = baddc d u_rep; ret err k depth d in
   if count > 0 then
     if not (is_hex_digit d.c) then (epos d; error (err_not_hex d.c) (readc k) depth d)
@@ -268,9 +280,9 @@ let rec r_u_escape hi u count k (depth : int) (d : decoder) =                   
   | Some hi ->          (* combine high and low surrogate into scalar value. *)
       if u < 0xDC00 || u > 0xDFFF then error (err_not_lo u) k depth d else
       let u = ((((hi land 0x3FF) lsl 10) lor (u land 0x3FF)) + 0x10000) in
-      (baddc d u; k (succ depth) d)
+      (baddc d u; r_cont k depth d)
   | None ->
-      if u < 0xD800 || u > 0xDFFF then (baddc d u; k (succ depth) d) else
+      if u < 0xD800 || u > 0xDFFF then (baddc d u; r_cont k depth d) else
       if u > 0xDBFF then error (err_lone_lo u) k depth d else
       if d.c <> u_bslash then error (err_lone_hi u) k depth d else
       readc (fun depth d ->
@@ -289,7 +301,7 @@ and r_escape k depth d = match d.c with
 | 0x75 (* u *) -> readc (r_u_escape None 0 4 k) depth d
 | c -> epos d; baddc d u_rep; ret (err_not_esc c) (readc k) depth d
 
-let rec r_string k (depth : int) (d : decoder) =                                (* {string}, '' eaten. *)
+let rec r_string k depth d =                                (* {string}, '' eaten. *)
   if d.c = ux_eoi then (epos d; ret err_unclosed_string ret_eoi depth d) else
   if not (must_escape d.c) then (badd d; readc (r_string k) depth d) else
   if d.c = u_quot then (epos d; readc k depth d) else
@@ -385,7 +397,7 @@ let rec r_json k depth d =                                              (* {valu
   if d.c <> ux_eoi then r_value err k depth d else ret err_exp_json k depth d
 
 let r_start d =                                            (* start of input *)
-  let bom k depth d = if Uutf.decoder_removed_bom d.u then ret err_bom k depth d else k (succ depth) d in
+  let bom k depth d = if Uutf.decoder_removed_bom d.u then ret err_bom k depth d else r_cont k depth d in
   readc (bom (r_white (r_json r_lexeme))) d
 
 let nln = `ASCII (Uchar.unsafe_of_int 0x000A)
@@ -399,13 +411,13 @@ let decoder ?encoding src =
 let decode_uncut d =
   d.uncut <- true;
   let rec loop d =
-    match d.k 0 d with
+    match d.k Depth.zero d with
     | #decode as v -> (v :> [> decode])
     | #uncut as v ->  (v :> [> uncut])
     | `Continue -> loop d
   in loop d
 
-let rec decode d = match (d.uncut <- false; d.k 0 d) with
+let rec decode d = match (d.uncut <- false; d.k Depth.zero d) with
 | #decode as v -> (v :> [> decode])
 | `Continue -> decode d
 | `Comment _ | `White _ -> assert false
@@ -451,34 +463,37 @@ type encoder =
     mutable next_name : bool;         (* [true] if next encode should `Name. *)
     mutable last_start : bool;     (* [true] if last encode was [`As | `Os]. *)
     mutable k :                                     (* decoder continuation. *)
-      int -> encoder -> [ encode | uncut ] -> [ `Ok | `Partial | `Continue ] }
+      Depth.t -> encoder -> [ encode | uncut ] -> [ `Ok | `Partial | `Continue ] }
 
 let o_rem e = e.o_max - e.o_pos + 1    (* remaining bytes to write in [e.o]. *)
 let dst e s j l =                                     (* set [e.o] with [s]. *)
   if (j < 0 || l < 0 || j + l > Bytes.length s) then invalid_bounds j l;
   e.o <- s; e.o_pos <- j; e.o_max <- j + l - 1
 
-let partial k depth e = function `Await -> k (succ depth) e | v -> expect_await v
+
+let partial k depth e = function `Await -> k Depth.zero e | v -> expect_await v
+
+let w_cont k (depth : Depth.t) e =
+  if Depth.allow_direct_call depth
+  then k (Depth.succ depth) e
+  else (e.k <- partial k; `Continue)
+
 let flush k depth e = match e.dst with  (* get free space in [d.o] and [k]ontinue. *)
 | `Manual -> e.k <- partial k; `Partial
-| `Channel oc -> output oc e.o 0 e.o_pos; e.o_pos <- 0; k (succ depth) e
+| `Channel oc -> output oc e.o 0 e.o_pos; e.o_pos <- 0; w_cont k depth e
 | `Buffer b ->
     let o = Bytes.unsafe_to_string e.o in
-    Buffer.add_substring b o 0 e.o_pos; e.o_pos <- 0; k (succ depth) e
+    Buffer.add_substring b o 0 e.o_pos; e.o_pos <- 0; w_cont k depth e
 
 
-let rec writeb b k (depth :int) (e :encoder) =                     (* write byte [b] and [k]ontinue. *)
+let rec writeb b k depth e =                     (* write byte [b] and [k]ontinue. *)
   if e.o_pos > e.o_max then flush (writeb b k) depth e else
-  (unsafe_set_byte e.o e.o_pos b; e.o_pos <- e.o_pos + 1; k (succ depth) e)
+  (unsafe_set_byte e.o e.o_pos b; e.o_pos <- e.o_pos + 1; w_cont k depth e)
 
 let rec writes s j l k depth e =      (* write [l] bytes from [s] starting at [j]. *)
   let rem = o_rem e in
   if rem >= l then
-    if depth > 10
-    then (
-      (e.k <- partial (writes s j l k));
-      `Continue )
-    else (unsafe_blit s j e.o e.o_pos l; e.o_pos <- e.o_pos + l; k (succ depth) e)
+    (unsafe_blit s j e.o e.o_pos l; e.o_pos <- e.o_pos + l; w_cont k depth e)
   else begin
     unsafe_blit s j e.o e.o_pos rem; e.o_pos <- e.o_pos + rem;
     flush (writes s (j + rem) (l - rem) k) depth e
@@ -487,7 +502,7 @@ let rec writes s j l k depth e =      (* write [l] bytes from [s] starting at [j
 let rec writebuf j l k depth e =  (* write [l] bytes from [e.buf] starting at [j]. *)
   let rem = o_rem e in
   if rem >= l
-  then (Buffer.blit e.buf j e.o e.o_pos l; e.o_pos <- e.o_pos + l; k (succ depth) e)
+  then (Buffer.blit e.buf j e.o e.o_pos l; e.o_pos <- e.o_pos + l; w_cont k depth e)
   else begin
     Buffer.blit e.buf j e.o e.o_pos rem; e.o_pos <- e.o_pos + rem;
     flush (writebuf (j + rem) (l - rem) k) depth e
@@ -502,16 +517,16 @@ let w_indent k depth e =
     in
     let rem = o_rem e in
     if rem < indent then (spaces e rem; flush (loop (indent - rem) k) depth e) else
-    (spaces e indent; k (succ depth) e)
+    (spaces e indent; w_cont k depth e)
   in
   loop (e.nest * 2) k depth e
 
-let w_json_string s k (depth : int) (e : encoder) =        (* escapes as mandated by the standard. *)
+let w_json_string s k depth e =        (* escapes as mandated by the standard. *)
   let rec loop s j pos max k depth e =
     if pos > max then (
       if j > max then
-        k (succ depth) e
-      else writes s j (pos - j) k (depth + 1) e)
+        w_cont k depth e
+      else writes s j (pos - j) k depth e)
     else
     let next = pos + 1 in
     let escape esc =                     (* assert (String.length esc = 2 ). *)
@@ -532,7 +547,7 @@ let w_json_string s k (depth : int) (e : encoder) =        (* escapes as mandate
   in
   writeb u_quot (loop s 0 0 (String.length s - 1) (writeb u_quot k)) depth e
 
-let w_name n k (depth : int) (e : encoder) =
+let w_name n k depth e =
   e.last_start <- false; e.next_name <- false;
   w_json_string n (writeb u_colon k) depth e
 
@@ -561,7 +576,7 @@ let w_value ~in_obj l k depth e = match l with
 | `Oe | `Ae | `Name _ as l ->
     if in_obj then expect_mem_value l else expect_arr_value_ae l
 
-let w_lexeme k (depth : int) (e : encoder) l =
+let w_lexeme k depth e l =
   let epop e =
     e.last_start <- false;
     e.nest <- e.nest - 1;  e.stack <- List.tl e.stack;
@@ -632,7 +647,7 @@ let encoder ?(minify = true) dst =
 
 let encode e v : [`Ok | `Partial] =
   let rec loop e v =
-    match e.k 0 e v with
+    match e.k Depth.zero e v with
     | `Ok | `Partial as x -> x
     | `Continue -> loop e `Await
   in loop e (v :> [ encode | uncut ])
@@ -655,7 +670,7 @@ module Uncut = struct
   let pp_decode = pp_decode
   let encode e v =
     let rec loop e v =
-      match e.k 0 e v with
+      match e.k Depth.zero e v with
       | `Ok | `Partial as x -> x
       | `Continue -> loop e `Await
     in
