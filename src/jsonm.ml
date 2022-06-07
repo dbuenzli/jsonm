@@ -164,6 +164,7 @@ let pp_error ppf = function
     end
 
 type pos = int * int
+type range = pos * pos
 type encoding = [ `UTF_8 | `UTF_16 | `UTF_16BE | `UTF_16LE ]
 type src = [ `Channel of in_channel | `String of string | `Manual ]
 type decode = [ `Await | `End | `Lexeme of lexeme | `Error of error ]
@@ -397,6 +398,8 @@ let rec decode d = match (d.uncut <- false; d.k d) with
 | `Comment _ | `White _ -> assert false
 
 let decoder_src d = Uutf.decoder_src d.u
+let decoded_start_pos d = (d.s_line, d.s_col)
+let decoded_end_pos d = (d.e_line, d.e_col)
 let decoded_range d = (d.s_line, d.s_col), (d.e_line, d.e_col)
 let decoder_encoding d = match Uutf.decoder_encoding d.u with
 | #encoding as enc -> enc
@@ -625,6 +628,94 @@ module Uncut = struct
   let decode = decode_uncut
   let pp_decode = pp_decode
   let encode e v = e.k e (v :> [ encode | uncut])
+end
+
+module Value = struct
+  type 'loc t = [
+  | `Null of 'loc
+  | `Bool of bool * 'loc
+  | `Float of float * 'loc
+  | `String of string * 'loc
+  | `A of 'loc t list * 'loc
+  | `O of ((string * 'loc) * 'loc t) list * 'loc
+  ]
+
+  type 'loc decode_result = [
+  | `Value of 'loc t
+     (** Decoding a full value succeeded. *)
+  | `Decoding_error of error
+    (** Decoding failed with an error. *)
+  | `Unexpected of [ `Lexeme of lexeme | `End ]
+    (** Unexpected (gramatically invalid) lexeme or end-of-input *)
+  | `Await of unit -> 'loc decode_result
+    (** The decoder uses a [`Manual]  source and awaits for more input.
+        The client must use {!Manual.src} to provide it and call the returned
+        thunk to keep decoding the value. *)
+  ]
+
+  let decode d : range decode_result =
+    let rec dec d f pos st k = match decode d with
+    | `Lexeme l -> f d pos st l k
+    | `Error err -> `Decoding_error err
+    | `End -> `Unexpected `End
+    | `Await -> `Await (fun () -> dec d f pos st k)
+    in
+    let rec value d () () l k = match l with
+    | `Os -> dec d obj (decoded_start_pos d) [] k
+    | `As -> dec d arr (decoded_start_pos d) [] k
+    | `Null -> k (`Null (decoded_range d))
+    | `Bool b -> k (`Bool (b, decoded_range d))
+    | `Float x -> k (`Float (x, decoded_range d))
+    | `String s -> k (`String (s, decoded_range d))
+    | _ -> `Unexpected (`Lexeme l)
+    and arr d start_pos vs l k = match l with
+    | `Ae ->
+        let end_pos = decoded_start_pos d in
+        k (`A (List.rev vs, (start_pos, end_pos)))
+    | _ ->
+        value d () () l (fun v -> dec d arr start_pos (v :: vs) k)
+    and obj d start_pos ms l k = match l with
+    | `Oe ->
+        let end_pos = decoded_start_pos d in
+        k (`O (List.rev ms, (start_pos, end_pos)))
+    | `Name n ->
+        let n_loc = decoded_range d in
+        dec d value () () (fun v -> dec d obj start_pos (((n, n_loc), v) :: ms) k)
+    | l -> `Unexpected (`Lexeme l)
+    in
+    dec d value () () (fun v -> `Value v)
+
+  type encode_result = [
+  | `Ok
+    (** Encoding the value suceeded. *)
+  | `Partial of unit -> encode_result
+    (** The decoder has a [`Manual] destination and needs more output storage.
+        The client must use {!Manual.dst} to provide a new buffer, and then call
+        the provided thunk to keep encoding the value. *)
+  ]
+
+  let encode  e (v : _ t)  : encode_result =
+    let rec feed e msg f v k = match encode e msg with
+    | `Ok -> f e v k
+    | `Partial -> `Partial (fun () -> feed e `Await f v k)
+    in
+    let enc e l f v k = feed e (`Lexeme l) f v k in
+    let rec value e v k = match v with
+    | `A (vs, _) -> enc e `As arr vs k
+    | `O (ms, _) -> enc e `Os obj ms k
+    | `Null _ -> enc e `Null continue () k
+    | `Bool (b, _) -> enc e (`Bool b) continue () k
+    | `Float (x, _) -> enc e (`Float x) continue () k
+    | `String (s, _) -> enc e (`String s) continue () k
+    and arr e vs k = match vs with
+    | v :: vs' -> value e v (fun e -> arr e vs' k)
+    | [] -> enc e `Ae continue () k
+    and obj e ms k = match ms with
+    | ((n, _), v) :: ms -> enc e (`Name n) value v (fun e -> obj e ms k)
+    | [] -> enc e `Oe continue () k
+    and continue e () k = k e
+    in
+    value e v (fun e -> feed e `End continue () (fun x -> `Ok))
 end
 
 (*---------------------------------------------------------------------------
