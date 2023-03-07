@@ -592,7 +592,7 @@ let rec encode_ k e = function
 let rec encode_loop e = e.k <- encode_ encode_loop; `Ok
 let rec encode_json e = function  (* first [k] to start with [`Os] or [`As]. *)
 | `Lexeme (`Null | `Bool _ | `Float _ | `String _ | `As | `Os as l) ->
-    w_value false l encode_loop e
+    w_value ~in_obj:false l encode_loop e
 | `End | `Lexeme _ as v -> expect_json v
 | `White _ | `Comment _ as v -> encode_ (fun e -> e.k <- encode_json; `Ok) e v
 | `Await -> `Ok
