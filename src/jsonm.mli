@@ -17,7 +17,7 @@
     Consult the {{!datamodel}data model}, {{!limitations}limitations}
     and {{!examples}examples} of use.
 
-    {3 References}
+    {b References}
     {ul
     {- T. Bray Ed.
     {e {{:http://tools.ietf.org/html/rfc7159}The JavaScript Object Notation

@@ -1,5 +1,4 @@
-PKG bytes uchar uutf
+PKG uutf b0.kit
 S src
 S test
-B _build/src
-B _build/test
+B _b0/**
