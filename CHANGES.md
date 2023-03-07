@@ -1,5 +1,9 @@
+v1.0.2 2023-03-07 La Forclaz (VS)
+---------------------------------
 
-- Require OCaml 4.05
+- Require OCaml 4.05.
+- Drop dependency on `uchar` and `bytes` compatibility
+  modules.
 
 v1.0.1 2016-03-07 La Forclaz (VS)
 ---------------------------------
